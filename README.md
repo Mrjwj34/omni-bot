@@ -6,4 +6,6 @@
 
 - `AGENTS.md` — 仓库级工程规范、Go/Svelte 5 现代写法约束、索引维护与 Git 纪律。
 - `.gitignore` — Go、Svelte 5 与本地运行数据/密钥的 Git 忽略规则。
+- `go.mod` — Go 模块定义与最低工具链版本声明。
 - `docs/` — 系统设计文档与评测方案目录。
+- `scripts/` — 本地与 GitHub Actions 共享的统一 CI 脚本与目录索引校验工具。

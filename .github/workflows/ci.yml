@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check WebUI presence
+        id: web
+        shell: bash
+        run: |
+          if [ -f web/package.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup pnpm
+        if: steps.web.outputs.exists == 'true'
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        if: steps.web.outputs.exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install WebUI dependencies
+        if: steps.web.outputs.exists == 'true'
+        shell: bash
+        run: pnpm --dir web install --frozen-lockfile
+
+      - name: Run unified CI (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/ci.sh --require-race
+
+      - name: Run unified CI (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/ci.ps1
