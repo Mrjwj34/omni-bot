@@ -4,4 +4,4 @@
 
 ## 文件索引
 
-- `+page.svelte` — Run Trace 视图占位壳与筛选标签框架。
+- `+page.svelte` — Run Trace 筛选列表、响应式主从详情面板、Gate/PAD 跃迁与被动记忆命中、Agent Loop 步进与可折叠工具/MCP 调用及出站动作 IR 视图。
