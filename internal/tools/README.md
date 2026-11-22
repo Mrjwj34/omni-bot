@@ -2,6 +2,10 @@
 
 工具注册表、安全执行器及核心内置工具实现（记忆主动回忆、DeepSeek 联网搜索、防 SSRF 网页正文提取与表情库管理）。
 
+## 目录索引
+
+- `sandbox/` — 默认关闭的受限沙箱 `bash`/`read`/`write`/`edit`/`find`/`grep` 工具集与环境脱敏实现。
+
 ## 文件索引
 
 - `registry.go` — `Tool` / `Result` 统一契约、`Registry` 确定性 Schema 导出、快照隔离与防 Panic/非法 JSON 安全执行器。
