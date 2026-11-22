@@ -4,4 +4,5 @@
 
 ## 目录索引
 
+- `kernel/` — Bot Kernel 主进程可执行入口（统一 HTTP/WS API、内嵌 WebUI 与 `migrate-legacy` 迁移 CLI）。
 - `napcat-adapter/` — NapCat OneBot v11 与 Bot Kernel Channel JSON-RPC 2.0 双向适配器。
