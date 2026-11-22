@@ -78,7 +78,7 @@ flowchart TB
 
 ### 3.1 传输与媒体边界
 
-* **控制面（WS + JSON-RPC 2.0）**：承载双向实时事件、能力注册与动作下发，线协议携带显式版本号（如 `?proto=1`）。
+* **控制面（WS + JSON-RPC 2.0）**：承载双向实时事件、能力注册与动作下发。开发阶段直接演进线协议，**不维护或迭代协议版本号**（不携带 `?proto=...` 等版本参数）。
 * **媒体面（HTTP Blob 端点）**：禁止将大体积图片、语音、视频以 Base64 塞入 WS JSON-RPC 帧。前端适配器先将媒体文件上传至 Kernel 的 HTTP Blob 接口换取 `blob_id`（或复用共享卷路径引用），JSON-RPC 载荷中一律只传递轻量 `MediaRef{blob_id, mime_type, size_bytes, duration_ms, meta}`。
 
 ### 3.2 平台格式归一化边界（Adapter 职责）
