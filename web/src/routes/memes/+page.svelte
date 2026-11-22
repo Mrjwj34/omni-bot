@@ -35,13 +35,18 @@
 
 	function splitTags(input: string | string[] | undefined): string[] {
 		if (!input) return [];
-		if (Array.isArray(input)) {
-			return input.map((s) => s.trim()).filter(Boolean);
+		const items = Array.isArray(input) ? input : [input];
+		const seen = new Set<string>();
+		const out: string[] = [];
+		for (const raw of items) {
+			for (const part of raw.split(/[\s,，、/]+/)) {
+				const token = part.trim();
+				if (!token || seen.has(token)) continue;
+				seen.add(token);
+				out.push(token);
+			}
 		}
-		return input
-			.split(/[,，、\s]+/)
-			.map((s) => s.trim())
-			.filter(Boolean);
+		return out;
 	}
 
 	function normalizeMeme(
@@ -50,10 +55,12 @@
 		const hash = raw.hash || raw.id || '';
 		const emotionTags =
 			raw.emotion_tags && raw.emotion_tags.length > 0
-				? raw.emotion_tags
+				? splitTags(raw.emotion_tags)
 				: splitTags(raw.emotions);
 		const sceneTags =
-			raw.scene_tags && raw.scene_tags.length > 0 ? raw.scene_tags : splitTags(raw.scenes);
+			raw.scene_tags && raw.scene_tags.length > 0
+				? splitTags(raw.scene_tags)
+				: splitTags(raw.scenes);
 		return {
 			...raw,
 			id: raw.id || hash,
@@ -423,7 +430,7 @@
 					type="button"
 					onclick={() => (selectedEmotion = active ? '' : emo)}
 					class={cn(
-						'cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-all duration-150',
+						'max-w-36 cursor-pointer truncate whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-all duration-150',
 						active
 							? 'bg-coral-500 text-white shadow-[0_6px_14px_-6px_rgba(255,115,84,0.65)]'
 							: 'bg-surface-subtle text-ink-secondary hover:bg-tint-peach hover:text-coral-600'
@@ -523,12 +530,16 @@
 
 						<div class="flex flex-wrap gap-1">
 							{#each meme.emotion_tags.slice(0, 3) as emo (emo)}
-								<span class="rounded-full bg-tint-peach px-2 py-0.5 text-[10px] font-medium text-coral-600">
+								<span
+									class="max-w-full truncate whitespace-nowrap rounded-full bg-tint-peach px-2 py-0.5 text-[10px] font-medium text-coral-600"
+								>
 									{emo}
 								</span>
 							{/each}
 							{#each meme.scene_tags.slice(0, 2) as scene (scene)}
-								<span class="rounded-full bg-tint-sky px-2 py-0.5 text-[10px] font-medium text-sky-600">
+								<span
+									class="max-w-full truncate whitespace-nowrap rounded-full bg-tint-sky px-2 py-0.5 text-[10px] font-medium text-sky-600"
+								>
 									{scene}
 								</span>
 							{/each}
