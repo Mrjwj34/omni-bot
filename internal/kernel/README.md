@@ -1,6 +1,6 @@
 # internal/kernel
 
-Bot Kernel 核心运行时包，负责按房间严格串行的 Single-Flight 总线、统一外部触发器、三阶段钩子管线（`OnGate` / `OnAssemble` / `OnPostRun`）与受控 `<= 6` 轮 Agent Loop。
+Bot Kernel 核心运行时包，负责按房间严格串行的 Single-Flight 总线、统一外部触发器、三阶段钩子管线（`OnGate` / `OnAssemble` / `OnPostRun`）、受控 `<= 6` 轮 Agent Loop、热重载运行时与完整 WebUI HTTP REST API。
 
 ## 文件索引
 
@@ -11,3 +11,6 @@ Bot Kernel 核心运行时包，负责按房间严格串行的 Single-Flight 总
 - `loop.go` — 受控 `<= 6` 轮 Agent Loop，保持冻结 `RunSpec` 前缀字节不变、透传不透明 `NativeContent`、受控单次重试与工具错误回传。
 - `pipeline.go` — 默认三阶段钩子管线（并发门控+PAD+向量、有序六层上下文装配、出站 IR 投递、Trace 持久化与非阻塞后台维护）。
 - `e2e_test.go` — 覆盖 Agent Loop 重试/容错/上限以及完整真实 SQLite+Hub+WS+Memory+Persona+Meme+Tools+Dreaming 的端到端集成测试。
+- `runtime.go` — 统一内核 `Runtime` 生命周期管理，支持 AI Registry、工具集（含默认关闭 Bash 沙箱开关）与 MCP 连接池原子热重载。
+- `httpapi.go` — 与 `web/src/lib/api/` 1:1 严格对齐的 WebUI HTTP REST API 处理器（驾驶舱、Trace、记忆、人格快照、表情媒体、脱敏配置与只写密钥、对话调试）。
+- `httpapi_test.go` — 覆盖全部 REST API 端点、只写密钥零泄露校验与配置热重载 Bash 沙箱开关的真实 `httptest` 契约测试。
