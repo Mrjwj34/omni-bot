@@ -29,5 +29,8 @@ for (const entry of readdirSync(distDir)) {
 }
 
 for (const entry of readdirSync(buildDir)) {
+	if (preserved.has(entry)) {
+		continue;
+	}
 	cpSync(path.join(buildDir, entry), path.join(distDir, entry), { recursive: true });
 }

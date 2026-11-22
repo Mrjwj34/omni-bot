@@ -11,3 +11,4 @@
 - `persona/` — 人格三层结构与三维 PAD 连续情绪系统及其评测模块。
 - `protocol/` — 前端适配器与 WebUI 共享的 WS JSON-RPC 2.0 线协议、内容块与出站动作 IR。
 - `store/` — SQLite WAL 持久化、动态配置、只写密钥、本地 Blob 存储与旧资产迁移包。
+- `webui/` — 通过 Go `embed.FS` 内嵌托管 SvelteKit SPA 静态产物的 HTTP 服务包。
