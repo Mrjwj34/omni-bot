@@ -54,6 +54,7 @@ type Config struct {
 	ActiveMinVectorSim       float32
 	ActiveSurfaceThreshold   float64
 	ReinforceCooldown        time.Duration
+	Distiller                Distiller
 	Location                 *time.Location
 	Clock                    func() time.Time
 	Logger                   *slog.Logger
@@ -179,10 +180,11 @@ type RecallResult struct {
 // Engine coordinates SQLite WAL persistence, the in-memory 1024d VectorCache,
 // hybrid passive/active recall, anti-Matthew reinforcement, distillation, and Dreaming.
 type Engine struct {
-	store    *store.Store
-	embedder Embedder
-	vectors  *VectorCache
-	cfg      Config
+	store     *store.Store
+	embedder  Embedder
+	distiller Distiller
+	vectors   *VectorCache
+	cfg       Config
 }
 
 // NewEngine initializes the production memory engine and hydrates the 1024d hot vector cache from SQLite.
@@ -192,10 +194,11 @@ func NewEngine(ctx context.Context, st *store.Store, embedder Embedder, cfg Conf
 	}
 	cfg = cfg.withDefaults()
 	e := &Engine{
-		store:    st,
-		embedder: embedder,
-		vectors:  NewVectorCache(cfg.VectorDim),
-		cfg:      cfg,
+		store:     st,
+		embedder:  embedder,
+		distiller: cfg.Distiller,
+		vectors:   NewVectorCache(cfg.VectorDim),
+		cfg:       cfg,
 	}
 	if err := e.ReloadVectors(ctx, ""); err != nil {
 		return nil, err

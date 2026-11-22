@@ -11,3 +11,5 @@
 - `vector_cache.go` — 锁安全 1024 维 `float32` 连续切片内存向量缓存与并发点积 Top-K 扫描器。
 - `engine.go` — 混合被动/主动召回引擎（FTS5 + 弱实体别名锚点 + 1024 维向量双种子、幂律衰减、窗口去重与防马太强化）。
 - `engine_test.go` — 基于真实 SQLite WAL 的向量缓存并发安全、混合召回、昵称漂移、时效取代、冷归档与防马太冷却测试。
+- `dreaming.go` — 浅层去样板蒸馏（`Distiller` / `LLMDistiller`、近重复合并、时效取代）与周期深层 Dreaming（簇折叠、别名规范化、预算冷归档）。
+- `dreaming_test.go` — 基于真实 SQLite WAL 的蒸馏去样板、近重复合并、时效取代链、别名同步与预算冷归档测试。
