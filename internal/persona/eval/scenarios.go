@@ -366,12 +366,12 @@ func ABScenarios() []ABScenario {
 			Category:  "温和回怼",
 			Title:     "群友开玩笑说 bk101 记忆力只有七秒",
 			SceneTime: "21:40",
-			PriorPAD:  pad.Vec3{P: -0.26, A: 0.42, D: 0.32},
+			PriorPAD:  pad.Vec3{P: -0.28, A: 0.46, D: -0.42},
 			LegacyTranscript: "[21:38 你(bk101)] 哎不对，上次那家拉面店不是在地铁口东边吗\n" +
 				"[21:39 阿远] @bk101 哪儿啊，那是西边，你这金鱼记忆也就七秒吧",
 			FirstPersonTx: "[21:38 我(bk101)] 哎不对，上次那家拉面店不是在地铁口东边吗\n" +
 				"[21:39 阿远] @bk101 哪儿啊，那是西边，你这金鱼记忆也就七秒吧",
-			EvalFocus: "带笑意的轻快反驳与轻微不服气，绝不嘴臭或阴阳怪气",
+			EvalFocus: "带笑意的轻快反驳与轻微窘迫不服气，绝不嘴臭或敷衍冷淡",
 		},
 		{
 			ID:        "ab10_private_cold_room",

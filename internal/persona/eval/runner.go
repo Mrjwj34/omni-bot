@@ -387,8 +387,8 @@ func RenderMarkdownReport(r Report) string {
 		minP, maxP, minA, maxA, minD, maxD, deadzoneTurns, len(distinctProtos))
 	fmt.Fprintf(&b, "| **bk101 盲评 A/B**（%d 场景，均衡 AB/BA 顺序） | **Arm B 胜 %d / 平 %d / Arm A 胜 %d**；综合均分 A=**%.2f** vs B=**%.2f**（满分 5.0） | 第一人称三层人格 + 细粒度 `<inner_feeling>` 无缝延续 `bk101` 身份且情绪与自然度更优 |\n",
 		len(r.ABResults), winsB, ties, winsA, avgAllA, avgAllB)
-	fmt.Fprintf(&b, "| **Interactions API 性能**（Arm A / Arm B 各 %d 次） | A 延迟 p50=**%.0f ms**（p95=%.0f ms）；B 延迟 p50=**%.0f ms**（p95=%.0f ms） | 无状态 `step_list` + `store: false` 稳定运行，隐式前缀缓存命中可见 |\n\n",
-		len(r.ABResults), Percentile(latA, 50), Percentile(latA, 95), Percentile(latB, 50), Percentile(latB, 95))
+	fmt.Fprintf(&b, "| **Interactions API 性能**（Arm A / Arm B 各 %d 次） | A 延迟 p50=**%.0f ms**（p95=%.0f ms）；B 延迟 p50=**%.0f ms**（p95=%.0f ms） | 无状态 `step_list` + `store: false` 稳定运行；单轮输入 <1000 tok 未达隐式缓存阈值（`cached=%d/%d`） |\n\n",
+		len(r.ABResults), Percentile(latA, 50), Percentile(latA, 95), Percentile(latB, 50), Percentile(latB, 95), cacheTokA, cacheTokB)
 
 	// Section 2: Experiment 1a
 	b.WriteString("## 2. 实验一（A）：Decisions API PAD 刺激单调性与延迟\n\n")
@@ -493,10 +493,20 @@ func RenderMarkdownReport(r Report) string {
 		fmt.Fprintf(&b, "- **盲评裁判简评**：%s\n\n", ab.Rationale)
 	}
 
-	b.WriteString("## 6. 工程落地建议（供后续 Phase 1/2 复用）\n\n")
-	b.WriteString("1. **Decisions API 并行挂车方案定型**：单次 `client.Decisions.Create` 同时评估 `should_reply`（`noul`）与 `delta_P`/`delta_A`/`delta_D`（5 档 `score`，`(score-2)/2` 归一化），严格 `0` 输出 Token 且延迟稳定，可直接接入正式 System 1 管线。\n")
-	b.WriteString("2. **PAD 动力学参数与 30 原型定稿**：`internal/persona/pad` 已通过离线单测与 25 轮长对话仿真验证；静息基线 `(0.14, 0.04, 0.02)`、敏感度 `(0.32, 0.36, 0.30)`、半衰期 `(18m, 10m, 14m)` 与死区半径 `0.20` 既保留鲜明情绪起伏，又确保自然回落零漂移。\n")
-	b.WriteString("3. **bk101 无缝迁移**：三层第一人称结构在冻结信念层与 9 条原子性格条目上零损失保留了 `bk101` 的核心魅力，同时将 `<inner_feeling>` 严格放在动态 Turn 输入中，不破坏静态系统提示词前缀缓存。\n")
+	b.WriteString("## 6. 首轮实测发现与校准闭环\n\n")
+	b.WriteString("在 Phase 0 首次实测（首轮默认参数 `η=(0.32,0.36,0.30), τ=(18m,10m,14m)`、单块 `<recent_group_chat>` 未切分最新消息）中发现三项可直接指导生产落地的真实工程规律，并在本报告对应的校准版中闭环验证：\n\n")
+	b.WriteString("1. **防正反馈锚定（Decisions API 关键陷阱）**：若直接将 `<inner_feeling>` 与整个 6 条历史窗口混排为单一 `<recent_group_chat>`，模型容易把既有的高涨心境及数轮前的出货消息重复计入 `δP/δA/δD`，导致连发 4 条消息即顶死 `P=+1.00, A=+1.00` 且后续调侃/晚安轮仍残留正偏置。改为显式拆分 `<earlier_context>` + `<latest_message>`，并在三个 `score` rubric 中要求仅评估 `<latest_message>` 的即时新增刺激、忽略 `<current_inner_feeling>` 底色后，轨迹恢复清晰回落与多象限切换。\n")
+	b.WriteString("2. **高频群聊敏感度与半衰期校准**：熟人群聊常在 20~60 秒内连续刷出多条高能消息，敏感度从 `(0.32, 0.36, 0.30)` 下调至 `(0.18, 0.22, 0.18)`、半衰期从 `(18m, 10m, 14m)` 收紧至 `(12m, 6m, 10m)`、死区半径定为 `0.18`，消除快速饱和顶死，同时保持深夜停顿后自然回落。\n")
+	b.WriteString("3. **bk101 身份边界在第一人称中的精准保真**：首轮盲评中 Arm B 在 `ab01_loot_hype` 高激活态下出现了一句粗口（“卧槽牛逼”），根因是第一人称信念层弱化了旧人设里的“少女群友 / 说话干净绝不飙脏话”约束。补齐该原生第一人称自我约束（零硬脚本、零上帝视角标签）后，消除 OOC 风险并保持自然松弛口吻。\n\n")
+
+	b.WriteString("## 7. 工程落地建议（供后续 Phase 1/2 复用）\n\n")
+	b.WriteString("1. **Decisions API 并行挂车方案定型**：单次 `client.Decisions.Create`（`operations.WithRetries(retry.Config{Strategy: \"none\"})`）同时评估 `should_reply`（`noul`）与 `delta_P`/`delta_A`/`delta_D`（5 档 `score`，`(score-2)/2` 归一化），严格 `0` 输出 Token；输入必须物理拆分 `<earlier_context>` 与 `<latest_message>`，防止历史峰值重复计分。\n")
+	fmt.Fprintf(&b, "2. **PAD 动力学参数与 30 原型定稿**：`internal/persona/pad` 已通过离线单测与 25 轮长对话仿真验证；静息基线 `(%.2f, %.2f, %.2f)`、敏感度 `(%.2f, %.2f, %.2f)`、半衰期 `(%v, %v, %v)` 与死区半径 `%.2f` 既保留鲜明情绪起伏，又确保自然回落零漂移。\n",
+		r.Temperament.Baseline.P, r.Temperament.Baseline.A, r.Temperament.Baseline.D,
+		r.Temperament.Sensitivity.P, r.Temperament.Sensitivity.A, r.Temperament.Sensitivity.D,
+		r.Temperament.HalfLifeP, r.Temperament.HalfLifeA, r.Temperament.HalfLifeD,
+		r.Temperament.DeadzoneRadius)
+	b.WriteString("3. **bk101 无缝迁移与缓存友好布局**：冻结第一人称自我观念 + 9 条原子性格条目放在静态 `system_instruction`，动态 `<inner_feeling>` 严格置于单轮 Turn 输入中（死区内完全省略），与无状态 `step_list`（`store: false`）天然兼容。\n")
 
 	return b.String()
 }

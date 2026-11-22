@@ -49,15 +49,15 @@ type Temperament struct {
 
 // DefaultTemperament returns calibrated baseline dynamics for a warm, lively close-knit group persona.
 func DefaultTemperament() Temperament {
-	base := Vec3{P: 0.14, A: 0.04, D: 0.02}
+	base := Vec3{P: 0.12, A: 0.02, D: 0.02}
 	return Temperament{
 		InitialBaseline: base,
 		Baseline:        base,
-		Sensitivity:     Vec3{P: 0.32, A: 0.36, D: 0.30},
-		HalfLifeP:       18 * time.Minute,
-		HalfLifeA:       10 * time.Minute,
-		HalfLifeD:       14 * time.Minute,
-		DeadzoneRadius:  0.20,
+		Sensitivity:     Vec3{P: 0.18, A: 0.22, D: 0.18},
+		HalfLifeP:       12 * time.Minute,
+		HalfLifeA:       6 * time.Minute,
+		HalfLifeD:       10 * time.Minute,
+		DeadzoneRadius:  0.18,
 	}
 }
 

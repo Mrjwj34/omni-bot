@@ -154,35 +154,35 @@ func NormalizeFivePointScore(score float64) float64 {
 
 // EvaluateDecision runs should_reply (noul) and delta_P/delta_A/delta_D (5-point score) in ONE parallel call.
 func (c *Client) EvaluateDecision(ctx context.Context, inputText string) (DecisionResult, error) {
-	shouldReplyInstr := "结合 <persona_self>、<inner_feeling>（若有）与 <recent_group_chat>，判断 bk101 此刻是否适合自然接话发言。被 @、被点名、大家热聊可接梗或分享喜讯/吃瓜时倾向发言；不熟的私事、无聊复读刷屏或深夜散场时倾向安静不插嘴。"
+	shouldReplyInstr := "结合 <persona_self>、<current_inner_feeling>（若有）、<earlier_context> 与 <latest_message>，判断 bk101 此刻是否适合自然接话发言。被 @、被点名、大家热聊可接梗或分享喜讯/吃瓜时倾向发言；不熟的私事、无聊复读刷屏、群友吵架摩擦或深夜道晚安散场时倾向安静不插嘴。"
 	trueDesc := "自然适合接话或回应"
 	falseDesc := "更适合安静看着不插嘴"
 
-	deltaPInstr := "从 bk101 本人的主观感受出发，评估 <recent_group_chat> 最新消息对她此刻愉悦度（Pleasure）的即时刺激变化量。"
+	deltaPInstr := "仅评估 <latest_message> 这一条最新消息本身对 bk101 愉悦度（Pleasure）的即时增量刺激，忽略 <current_inner_feeling> 中的既有心情底色，也不要重复累加 <earlier_context> 里已经过去的高兴/难过事件。"
 	deltaPCriteria := []string{
-		"明显不爽、受挫、揪心或被呛到",
-		"轻微扫兴、尴尬、委屈或有点烦",
-		"基本中性，对开心与否几乎没波澜",
-		"轻微开心、暖心、有趣或受用",
-		"明显开心、惊喜、振奋或特别受用",
+		"这条新消息令人明显不爽、受挫、揪心难受或被呛到",
+		"这条新消息带来轻微扫兴、尴尬、委屈或有点不快",
+		"这条新消息对愉悦度基本中性无波澜（含普通闲聊、私事、道晚安）",
+		"这条新消息带来轻微开心、暖心、有趣或受用",
+		"这条新消息带来明显开心、惊喜、振奋或强烈受用",
 	}
 
-	deltaAInstr := "从 bk101 本人的主观感受出发，评估 <recent_group_chat> 最新消息对她此刻激活度/精力起伏（Arousal）的即时刺激变化量。"
+	deltaAInstr := "仅评估 <latest_message> 这一条最新消息本身对 bk101 激活度/精力起伏（Arousal）的即时增量刺激，忽略 <current_inner_feeling> 中的既有状态和更早的旧消息。"
 	deltaACriteria := []string{
-		"明显泄气、犯困、发沉或彻底冷场",
-		"轻微松弛下来、放慢节奏或提不起劲",
-		"精力与紧绷度基本不变",
-		"注意力被勾起、精神微提或略微起劲/局促",
-		"明显兴奋、上头、吃瓜起劲或情绪高度绷紧",
+		"这条新消息明显让人泄气、犯困、发沉或彻底冷场散场",
+		"这条新消息让人略微松弛、放慢节奏、提不起劲或准备收尾",
+		"这条新消息对精力与紧绷度基本无额外推动",
+		"这条新消息勾起注意力、精神微提或略微起劲/局促",
+		"这条新消息令人明显兴奋、上头、吃瓜起劲或情绪骤然紧绷",
 	}
 
-	deltaDInstr := "从 bk101 本人的主观感受出发，评估 <recent_group_chat> 最新消息对她此刻掌控感/底气（Dominance）的即时刺激变化量。"
+	deltaDInstr := "仅评估 <latest_message> 这一条最新消息本身对 bk101 掌控感/底气（Dominance）的即时增量刺激，忽略 <current_inner_feeling> 中的既有状态。"
 	deltaDCriteria := []string{
-		"明显吃瘪、被起哄架住、被骗尴尬或无力应对",
-		"轻微被动、有点不好意思、拿不准或略受牵制",
-		"掌控感与主动权基本平稳中性",
-		"比较从容、有底气或被信任请教",
-		"明显占上风、很有底气、被认可或拿捏局面",
+		"这条新消息让 bk101 明显吃瘪、被起哄架住、被骗尴尬或被呛压制",
+		"这条新消息让 bk101 轻微被动、拿不准、被套路逗弄或替人无力",
+		"这条新消息对掌控感与主动权基本平稳中性",
+		"这条新消息让 bk101 比较从容、有底气或被信任请教",
+		"这条新消息让 bk101 明显占上风、很有底气、被大力认可或拿捏局面",
 	}
 
 	req := operations.CreateDecisionRequest{
