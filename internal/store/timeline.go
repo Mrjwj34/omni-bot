@@ -96,6 +96,85 @@ func (s *Store) AppendTimelineMessage(ctx context.Context, msg TimelineMessage) 
 	return id, nil
 }
 
+// UpsertTimelineBatch atomically upserts a batch of timeline messages inside a single SQLite transaction.
+func (s *Store) UpsertTimelineBatch(ctx context.Context, msgs []TimelineMessage) error {
+	if len(msgs) == 0 {
+		return nil
+	}
+	tx, err := s.writeDB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: begin timeline batch: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmtExplicit, err := tx.PrepareContext(ctx, `INSERT INTO timeline_messages (
+		seq_id, channel_id, room_id, msg_id, sender_id, sender_name,
+		is_bot, is_at_bot, timestamp_ms, content_json, rendered_text, status, archived_to_memory
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	ON CONFLICT(seq_id) DO UPDATE SET
+		channel_id = excluded.channel_id,
+		room_id = excluded.room_id,
+		msg_id = excluded.msg_id,
+		sender_id = excluded.sender_id,
+		sender_name = excluded.sender_name,
+		is_bot = excluded.is_bot,
+		is_at_bot = excluded.is_at_bot,
+		timestamp_ms = excluded.timestamp_ms,
+		content_json = excluded.content_json,
+		rendered_text = excluded.rendered_text,
+		status = excluded.status,
+		archived_to_memory = excluded.archived_to_memory`)
+	if err != nil {
+		return fmt.Errorf("store: prepare explicit timeline batch: %w", err)
+	}
+	defer func() { _ = stmtExplicit.Close() }()
+
+	stmtAuto, err := tx.PrepareContext(ctx, `INSERT INTO timeline_messages (
+		channel_id, room_id, msg_id, sender_id, sender_name,
+		is_bot, is_at_bot, timestamp_ms, content_json, rendered_text, status, archived_to_memory
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("store: prepare auto timeline batch: %w", err)
+	}
+	defer func() { _ = stmtAuto.Close() }()
+
+	for _, msg := range msgs {
+		if msg.RoomID == "" {
+			return errors.New("store: timeline batch contains empty room_id")
+		}
+		if msg.ContentJSON == "" {
+			msg.ContentJSON = "[]"
+		}
+		if msg.Status == "" {
+			msg.Status = "UNPROCESSED"
+		}
+		if msg.SeqID > 0 {
+			if _, err := stmtExplicit.ExecContext(
+				ctx,
+				msg.SeqID, msg.ChannelID, msg.RoomID, msg.MsgID, msg.SenderID, msg.SenderName,
+				boolToInt(msg.IsBot), boolToInt(msg.IsAtBot), msg.TimestampMs,
+				msg.ContentJSON, msg.RenderedText, msg.Status, boolToInt(msg.ArchivedToMemory),
+			); err != nil {
+				return fmt.Errorf("store: batch upsert seq=%d: %w", msg.SeqID, err)
+			}
+		} else {
+			if _, err := stmtAuto.ExecContext(
+				ctx,
+				msg.ChannelID, msg.RoomID, msg.MsgID, msg.SenderID, msg.SenderName,
+				boolToInt(msg.IsBot), boolToInt(msg.IsAtBot), msg.TimestampMs,
+				msg.ContentJSON, msg.RenderedText, msg.Status, boolToInt(msg.ArchivedToMemory),
+			); err != nil {
+				return fmt.Errorf("store: batch append timeline: %w", err)
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: commit timeline batch: %w", err)
+	}
+	return nil
+}
+
 // ListRecentTimeline returns up to limit most recent messages for roomID in chronological order.
 func (s *Store) ListRecentTimeline(ctx context.Context, roomID string, limit int) ([]TimelineMessage, error) {
 	if limit <= 0 {
