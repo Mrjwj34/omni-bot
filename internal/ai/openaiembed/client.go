@@ -83,9 +83,7 @@ func New(resolved ai.ResolvedModel, opts ...Option) (*Client, error) {
 		o.DefaultDimensions = DefaultDimensions
 	}
 	if o.MaxBatchSize <= 0 || o.MaxBatchSize > DefaultBatchSize {
-		if o.MaxBatchSize <= 0 {
-			o.MaxBatchSize = DefaultBatchSize
-		}
+		o.MaxBatchSize = DefaultBatchSize
 	}
 
 	if strings.TrimSpace(resolved.Provider.BaseURL) == "" {
