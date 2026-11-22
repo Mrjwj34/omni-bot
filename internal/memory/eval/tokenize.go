@@ -44,7 +44,7 @@ func extractFTSTokens(text string) []string {
 		}
 		tok := strings.ToLower(asciiBuf.String())
 		asciiBuf.Reset()
-		// Skip pure 4-digit year or 2-digit date fragments from [YYYY-MM-DD] prefixes.
+		// Skip 1-2 digit numeric fragments (e.g. month/day numbers from [YYYY-MM-DD] prefixes).
 		if isPureDigits(tok) && len(tok) <= 2 {
 			return
 		}

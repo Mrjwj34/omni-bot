@@ -2,10 +2,9 @@ module omni-bot
 
 go 1.26.0
 
-require (
-	google.golang.org/genai v1.79.1
-	modernc.org/sqlite v1.63.0
-)
+require modernc.org/sqlite v1.63.0
+
+require google.golang.org/genai v1.79.1
 
 require (
 	cloud.google.com/go v0.116.0 // indirect

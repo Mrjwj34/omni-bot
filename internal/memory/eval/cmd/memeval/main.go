@@ -18,7 +18,7 @@ import (
 
 func main() {
 	envPath := flag.String("env", "", "path to .env.local (auto-discovered if empty)")
-	cacheDir := flag.String("cache-dir", `c:\Projects\omni-bot\data\eval_cache`, "local directory for cached embeddings")
+	cacheDir := flag.String("cache-dir", filepath.Join("data", "eval_cache"), "local directory for cached embeddings")
 	live := flag.Bool("live", false, "call live Qwen3-Embedding-4B API for B4 (2560d and 1024d)")
 	legacyJSON := flag.String("legacy-json", "", "optional path to anonymized legacy_mem0_export.json for real-data sanity check")
 	verbose := flag.Bool("verbose", false, "print per-query misses and noise false positives for B3 and B4")
@@ -256,12 +256,8 @@ func loadEnv(explicitPath string) error {
 	if explicitPath != "" {
 		return envload.LoadFile(explicitPath)
 	}
-	if found, err := envload.LoadRepoEnv(""); err != nil {
-		return err
-	} else if found != "" {
-		return nil
-	}
-	return envload.LoadIfExists(`c:\Projects\omni-bot\.env.local`)
+	_, err := envload.LoadRepoEnv("")
+	return err
 }
 
 func countDistractors(mems []eval.Memory) int {
@@ -514,7 +510,7 @@ func runLegacySanityCheck(ctx context.Context, path string, live bool, cacheDir 
 			}
 		}
 		fmt.Printf("  Probe %-13s | legacy_top4: top1=%.3f dup_pairs=%d | filtered_dedup_top4: count=%d top1=%.3f\n",
-			p.label, top4[0].Similarity, dupPairs, len(deduped), firstSim(deduped))
+			p.label, firstSim(top4), dupPairs, len(deduped), firstSim(deduped))
 	}
 	return nil
 }

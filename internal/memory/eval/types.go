@@ -45,8 +45,6 @@ type Memory struct {
 	SupersededBy string
 	// MergedSource marks episodic fragments consolidated into a semantic final fact.
 	MergedSource bool
-	// Consolidated marks semantic final facts distilled during Dreaming; excluded in B0/B1 raw baselines.
-	Consolidated bool
 	Importance   int
 	Strength     float64
 	LastRecalled int64
