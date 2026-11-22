@@ -20,5 +20,7 @@
 - `memes.go` — 表情包元数据、前缀查找、使用计数、软删除与 `meme_seen` 防重收录仓储方法。
 - `traces.go` — Run Trace 结构化可观测记录的写入、查询与列表仓储方法。
 - `config.go` — 动态运行配置（Provider、Model、Slot、MCP、Feature Flags）与脱敏视图仓储方法。
+- `blob.go` — 内容寻址 `blobs/` 与 `memes/` 本地原子文件存储及路径穿越防护实现。
 - `store_test.go` — 真实 SQLite WAL 参数、幂等迁移、FTS5 索引、向量编解码与密钥脱敏单元测试。
 - `repo_test.go` — 全领域仓储不变量与 WAL 并发读写压测单元测试。
+- `blob_test.go` — Blob 去重、失败原子清理、表情文件存取与路径穿越攻击向量单元测试。
