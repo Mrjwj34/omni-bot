@@ -84,7 +84,7 @@ type OneBotClientOptions struct {
 	WriteTimeout  time.Duration
 	SendBuffer    int
 	Logger        *slog.Logger
-	OnEvent       func(context.Context, OneBotEvent)
+	OnEvent       func(context.Context, *OneBotClient, OneBotEvent)
 }
 
 type OneBotClient struct {
@@ -92,7 +92,7 @@ type OneBotClient struct {
 	actionTimeout time.Duration
 	writeTimeout  time.Duration
 	logger        *slog.Logger
-	onEvent       func(context.Context, OneBotEvent)
+	onEvent       func(context.Context, *OneBotClient, OneBotEvent)
 
 	seq       atomic.Uint64
 	send      chan []byte
@@ -225,7 +225,7 @@ func (c *OneBotClient) readLoop(ctx context.Context) {
 			c.wg.Add(1)
 			go func(event OneBotEvent) {
 				defer c.wg.Done()
-				c.onEvent(ctx, event)
+				c.onEvent(ctx, c, event)
 			}(ev)
 		}
 	}

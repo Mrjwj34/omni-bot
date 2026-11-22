@@ -353,13 +353,10 @@ func (b *Bridge) serveNapCatClientOnce(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("dial napcat ws: %w", err)
 	}
 
-	var client *OneBotClient
-	client = NewOneBotClient(ctx, ws, OneBotClientOptions{
+	client := NewOneBotClient(ctx, ws, OneBotClientOptions{
 		ActionTimeout: b.cfg.ActionTimeout,
 		Logger:        b.logger,
-		OnEvent: func(evCtx context.Context, ev OneBotEvent) {
-			b.handleOneBotEvent(evCtx, client, ev)
-		},
+		OnEvent:       b.handleOneBotEvent,
 	})
 	if prev := b.setOneBot(client); prev != nil {
 		prev.Close()
@@ -403,13 +400,10 @@ func (b *Bridge) runNapCatReverseServer(ctx context.Context) error {
 			return
 		}
 
-		var client *OneBotClient
-		client = NewOneBotClient(ctx, ws, OneBotClientOptions{
+		client := NewOneBotClient(ctx, ws, OneBotClientOptions{
 			ActionTimeout: b.cfg.ActionTimeout,
 			Logger:        b.logger,
-			OnEvent: func(evCtx context.Context, ev OneBotEvent) {
-				b.handleOneBotEvent(evCtx, client, ev)
-			},
+			OnEvent:       b.handleOneBotEvent,
 		})
 		if prev := b.setOneBot(client); prev != nil {
 			prev.Close()
