@@ -12,3 +12,4 @@
 - `docs/` — 系统设计文档与评测方案目录。
 - `internal/` — Go 后端核心子系统与共享内部包目录。
 - `scripts/` — 本地与 GitHub Actions 共享的统一 CI 脚本与目录索引校验工具。
+- `web/` — Svelte 5 + SvelteKit + Tailwind v4 WebUI 前端工程（SPA 静态构建并内嵌至 Go）。

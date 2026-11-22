@@ -1,6 +1,6 @@
 # Go
 bin/
-dist/
+/dist/
 *.exe
 *.exe~
 *.dll
@@ -9,6 +9,11 @@ dist/
 *.test
 *.out
 coverage.*
+
+# Embedded WebUI build output (keep tracked placeholder & index)
+internal/webui/dist/*
+!internal/webui/dist/.gitkeep
+!internal/webui/dist/README.md
 
 # Frontend (Svelte 5 / Node)
 node_modules/
