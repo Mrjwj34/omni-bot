@@ -47,6 +47,7 @@
 	];
 
 	let selectedRoom = $state('debug-room');
+	let discoveredRooms = $state.raw<string[]>([]);
 	let customRoomMode = $state(false);
 	let customRoomInput = $state('');
 
@@ -66,6 +67,9 @@
 
 	let availableRooms = $derived.by(() => {
 		const set = new Set<string>(PRESET_ROOMS);
+		for (const room of discoveredRooms) {
+			if (room) set.add(room);
+		}
 		set.add(selectedRoom);
 		for (const msg of realtime.liveTimeline) {
 			if (msg.room_id) set.add(msg.room_id);
@@ -133,6 +137,21 @@
 			loading = false;
 		}
 	}
+
+	$effect(() => {
+		const ctrl = new AbortController();
+		void api
+			.getDashboard({ signal: ctrl.signal })
+			.then((res) => {
+				if (res.rooms && res.rooms.length > 0) {
+					discoveredRooms = res.rooms;
+				}
+			})
+			.catch(() => {
+				// Standalone offline preview keeps preset rooms.
+			});
+		return () => ctrl.abort();
+	});
 
 	$effect(() => {
 		const room = selectedRoom;

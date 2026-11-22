@@ -676,18 +676,18 @@
 				<a href="/chat" class="block focus-visible:outline-none">
 					<SurfaceCard variant="tint-peach" padding="md" interactive class="flex h-full flex-col justify-between">
 						<div class="flex items-center justify-between gap-2">
-							<span class="text-xs font-medium text-ink-secondary">今日消息 / 回复</span>
+							<span class="text-xs font-medium text-ink-secondary">时间线消息</span>
 							<MessageSquareText class="size-4 shrink-0 text-coral-500" />
 						</div>
 						<div class="mt-3 flex items-baseline justify-between gap-2">
 							<span class="font-mono text-2xl font-bold text-ink-primary">
-								{dashboard?.metrics.replies_today ?? '—'}
+								{dashboard?.metrics.messages_total !== undefined
+									? dashboard.metrics.messages_total.toLocaleString()
+									: (dashboard?.metrics.replies_today ?? '—')}
 							</span>
-							{#if dashboard?.metrics.avg_latency_ms}
-								<span class="font-mono text-[11px] text-coral-600">
-									{Math.round(dashboard.metrics.avg_latency_ms)}ms
-								</span>
-							{/if}
+							<span class="font-mono text-[11px] text-coral-600">
+								今日回复 {dashboard?.metrics.replies_today ?? 0}
+							</span>
 						</div>
 					</SurfaceCard>
 				</a>

@@ -215,6 +215,7 @@ export interface RunTraceDetail extends RunTraceSummary {
 export interface DashboardMetrics {
 	runs_today: number;
 	replies_today: number;
+	messages_total?: number;
 	memories_total: number;
 	memes_total: number;
 	avg_latency_ms: number;
@@ -228,6 +229,7 @@ export interface DashboardResponse {
 	adapters: AdapterInfo[];
 	metrics: DashboardMetrics;
 	recent_traces: RunTraceSummary[];
+	rooms?: string[];
 }
 
 export interface MemoryItem {

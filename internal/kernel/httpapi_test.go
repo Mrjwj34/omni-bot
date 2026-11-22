@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -117,8 +118,11 @@ func TestHTTPAPI_FullContractAndSecretRedaction(t *testing.T) {
 
 	var dash APIDashboardResponse
 	unmarshalJSON(t, doJSON(t, srv.Client(), http.MethodGet, srv.URL+"/api/dashboard", nil, http.StatusOK), &dash)
-	if dash.Status != "ok" || dash.Metrics.MemoriesTotal != 1 || dash.Metrics.RunsToday < 1 {
+	if dash.Status != "ok" || dash.Metrics.MemoriesTotal != 1 || dash.Metrics.RunsToday < 1 || dash.Metrics.MessagesTotal < 2 {
 		t.Fatalf("unexpected dashboard: %+v", dash)
+	}
+	if !slices.Contains(dash.Rooms, DefaultDebugRoomID) {
+		t.Fatalf("expected dashboard rooms to include %q, got %v", DefaultDebugRoomID, dash.Rooms)
 	}
 
 	var padHist struct {

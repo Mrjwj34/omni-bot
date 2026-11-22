@@ -59,6 +59,7 @@ type APIAdapterInfo struct {
 type APIDashboardMetrics struct {
 	RunsToday     int      `json:"runs_today"`
 	RepliesToday  int      `json:"replies_today"`
+	MessagesTotal int      `json:"messages_total"`
 	MemoriesTotal int      `json:"memories_total"`
 	MemesTotal    int      `json:"memes_total"`
 	AvgLatencyMs  int64    `json:"avg_latency_ms"`
@@ -99,6 +100,7 @@ type APIDashboardResponse struct {
 	Adapters     []APIAdapterInfo     `json:"adapters"`
 	Metrics      APIDashboardMetrics  `json:"metrics"`
 	RecentTraces []APIRunTraceSummary `json:"recent_traces"`
+	Rooms        []string             `json:"rooms,omitempty"`
 }
 
 type APIMemoryItem struct {
@@ -391,6 +393,11 @@ func (rt *Runtime) handleGetDashboard(w http.ResponseWriter, r *http.Request) {
 	if activeMemes, err := rt.Store.ListActiveMemes(ctx); err == nil {
 		memesTotal = len(activeMemes)
 	}
+	messagesTotal := 0
+	if totalMsgs, err := rt.Store.CountTimelineMessages(ctx); err == nil {
+		messagesTotal = totalMsgs
+	}
+	rooms, _ := rt.Store.ListRecentTimelineRooms(ctx, 20)
 
 	status := "ok"
 	if reg := rt.AIRegistry(); reg == nil {
@@ -405,12 +412,14 @@ func (rt *Runtime) handleGetDashboard(w http.ResponseWriter, r *http.Request) {
 		Metrics: APIDashboardMetrics{
 			RunsToday:     runsToday,
 			RepliesToday:  repliesToday,
+			MessagesTotal: messagesTotal,
 			MemoriesTotal: memTotal,
 			MemesTotal:    memesTotal,
 			AvgLatencyMs:  avgLatency,
 			CacheHitRatio: cacheRatio,
 		},
 		RecentTraces: recent,
+		Rooms:        rooms,
 	})
 }
 

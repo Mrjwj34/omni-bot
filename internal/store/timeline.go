@@ -294,6 +294,48 @@ func (s *Store) UpsertRoomSummary(ctx context.Context, summary RoomSummary) erro
 	return nil
 }
 
+// CountTimelineMessages returns the total number of persisted timeline messages across all rooms.
+func (s *Store) CountTimelineMessages(ctx context.Context) (int, error) {
+	var total int
+	if err := s.readDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM timeline_messages`).Scan(&total); err != nil {
+		return 0, fmt.Errorf("store: count timeline messages: %w", err)
+	}
+	return total, nil
+}
+
+// ListRecentTimelineRooms returns distinct non-empty room IDs ordered by most recent timeline activity.
+func (s *Store) ListRecentTimelineRooms(ctx context.Context, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := s.readDB.QueryContext(
+		ctx,
+		`SELECT room_id FROM timeline_messages
+		 WHERE room_id != ''
+		 GROUP BY room_id
+		 ORDER BY MAX(timestamp_ms) DESC, MAX(seq_id) DESC
+		 LIMIT ?`,
+		limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("store: list recent timeline rooms: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var rooms []string
+	for rows.Next() {
+		var roomID string
+		if err := rows.Scan(&roomID); err != nil {
+			return nil, fmt.Errorf("store: scan timeline room_id: %w", err)
+		}
+		rooms = append(rooms, roomID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: iterate timeline rooms: %w", err)
+	}
+	return rooms, nil
+}
+
 func scanTimelineRows(rows *sql.Rows) ([]TimelineMessage, error) {
 	var out []TimelineMessage
 	for rows.Next() {
