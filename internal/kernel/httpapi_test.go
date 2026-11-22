@@ -285,11 +285,12 @@ func TestHTTPAPI_FullContractAndSecretRedaction(t *testing.T) {
 
 	var updatedMeme APIMemeItem
 	unmarshalJSON(t, doJSON(t, srv.Client(), http.MethodPatch, srv.URL+"/api/memes/"+memeHash, map[string]any{
+		"overlay_text": "哈哈哈笑死",
 		"description":  "超开心大笑猫猫",
 		"emotion_tags": []string{"开心", "大笑"},
 		"scene_tags":   []string{"接梗"},
 	}, http.StatusOK), &updatedMeme)
-	if updatedMeme.Description != "超开心大笑猫猫" || len(updatedMeme.EmotionTags) != 2 {
+	if updatedMeme.OverlayText != "哈哈哈笑死" || updatedMeme.Description != "超开心大笑猫猫" || len(updatedMeme.EmotionTags) != 2 {
 		t.Fatalf("unexpected updated meme: %+v", updatedMeme)
 	}
 
@@ -309,12 +310,13 @@ func TestHTTPAPI_FullContractAndSecretRedaction(t *testing.T) {
 	patchRespRaw := doJSON(t, srv.Client(), http.MethodPatch, srv.URL+"/api/config", map[string]any{
 		"providers": []map[string]any{
 			{
-				"id":       "google-main",
-				"name":     "Google Gemini",
-				"kind":     "google",
-				"base_url": "https://generativelanguage.googleapis.com",
-				"api_key":  rawSecret,
-				"enabled":  true,
+				"id":         "google-main",
+				"name":       "Google Gemini",
+				"kind":       "google",
+				"base_url":   "https://generativelanguage.googleapis.com",
+				"secret_key": "custom-gemini-key",
+				"api_key":    rawSecret,
+				"enabled":    true,
 			},
 		},
 		"model_slots": []map[string]any{
@@ -345,8 +347,8 @@ func TestHTTPAPI_FullContractAndSecretRedaction(t *testing.T) {
 	}
 	var cfgView APIRuntimeConfig
 	unmarshalJSON(t, getCfgRaw, &cfgView)
-	if len(cfgView.Providers) != 1 || !cfgView.Providers[0].HasAPIKey || !strings.HasPrefix(cfgView.Providers[0].APIKeyHint, "***") {
-		t.Fatalf("expected redacted provider key metadata, got %+v", cfgView.Providers)
+	if len(cfgView.Providers) != 1 || cfgView.Providers[0].SecretKey != "custom-gemini-key" || !cfgView.Providers[0].HasAPIKey || !strings.HasPrefix(cfgView.Providers[0].APIKeyHint, "***") {
+		t.Fatalf("expected redacted provider key metadata with custom secret_key, got %+v", cfgView.Providers)
 	}
 	if !cfgView.Features.BashEnabled {
 		t.Fatalf("expected bash_enabled=true after config patch, got %+v", cfgView.Features)

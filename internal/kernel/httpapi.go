@@ -158,6 +158,7 @@ type APIMemeItem struct {
 	BlobID      string   `json:"blob_id"`
 	ThumbURL    string   `json:"thumb_url"`
 	ImageURL    string   `json:"image_url"`
+	OverlayText string   `json:"overlay_text,omitempty"`
 	Description string   `json:"description"`
 	EmotionTags []string `json:"emotion_tags"`
 	SceneTags   []string `json:"scene_tags"`
@@ -222,12 +223,13 @@ type APIRuntimeConfig struct {
 }
 
 type APIProviderUpdateInput struct {
-	ID      string `json:"id,omitempty"`
-	Name    string `json:"name"`
-	Kind    string `json:"kind"`
-	BaseURL string `json:"base_url"`
-	APIKey  string `json:"api_key,omitempty"`
-	Enabled bool   `json:"enabled"`
+	ID        string `json:"id,omitempty"`
+	Name      string `json:"name"`
+	Kind      string `json:"kind"`
+	BaseURL   string `json:"base_url"`
+	SecretKey string `json:"secret_key,omitempty"`
+	APIKey    string `json:"api_key,omitempty"`
+	Enabled   bool   `json:"enabled"`
 }
 
 type APIRuntimeConfigPatch struct {
@@ -1228,7 +1230,10 @@ func (rt *Runtime) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 				id = slugID(in.Name, fmt.Sprintf("provider-%d", i+1))
 			}
 			prev := existingByID[id]
-			secKey := prev.SecretKey
+			secKey := strings.TrimSpace(in.SecretKey)
+			if secKey == "" {
+				secKey = prev.SecretKey
+			}
 			if secKey == "" {
 				secKey = providerSecretKey(id)
 			}
@@ -1853,6 +1858,7 @@ func toAPIMeme(m store.Meme) APIMemeItem {
 		BlobID:      m.Hash,
 		ThumbURL:    "/api/memes/" + m.Hash + "/thumb",
 		ImageURL:    "/api/memes/" + m.Hash + "/image",
+		OverlayText: m.OverlayText,
 		Description: m.Description,
 		EmotionTags: splitTags(m.Emotions),
 		SceneTags:   splitTags(m.Scenes),
