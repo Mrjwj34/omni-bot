@@ -1,0 +1,39 @@
+# Go
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.*
+
+# Frontend (Svelte 5 / Node)
+node_modules/
+.svelte-kit/
+build/
+.vite/
+*.tsbuildinfo
+
+# Local Runtime Data & Secrets
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+.env
+.env.*
+config.local.yaml
+config.local.yml
+config.local.json
+
+# OS & Editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
