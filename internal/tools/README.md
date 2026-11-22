@@ -4,6 +4,7 @@
 
 ## 目录索引
 
+- `mcp/` — 基于官方 MCP Go SDK 的 Streamable HTTP / stdio 客户端管理器与动态工具快照热刷新包。
 - `sandbox/` — 默认关闭的受限沙箱 `bash`/`read`/`write`/`edit`/`find`/`grep` 工具集与环境脱敏实现。
 
 ## 文件索引
