@@ -4,6 +4,7 @@
 
 ## 目录索引
 
+- `ai/` — AI 三层抽象（Provider / Protocol / Model）、协议适配器与多模态降级中间件。
 - `channel/` — Channel Hub WS JSON-RPC 2.0 服务端、WebUI 实时广播与 HTTP Blob 媒体端点。
 - `envload/` — 开发期与离线评测用的轻量 `.env.local` 环境变量加载器。
 - `memory/` — 记忆层存储、召回与阶段 0 离线消融评测子系统。
