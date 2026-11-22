@@ -5,6 +5,7 @@
 ## 目录索引
 
 - `AGENTS.md` — 仓库级工程规范、Go/Svelte 5 现代写法约束、索引维护与 Git 纪律。
+- `.gitattributes` — 强制跨平台统一 LF 换行符规则，避免 Windows 检出导致 `gofmt` 与 Shell 脚本失败。
 - `.gitignore` — Go、Svelte 5 与本地运行数据/密钥的 Git 忽略规则。
 - `go.mod` — Go 模块定义与最低工具链版本声明。
 - `go.sum` — Go 模块依赖校验和锁定文件。
