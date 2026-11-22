@@ -5,8 +5,8 @@
 ## 1. 仓库导航与必读顺序
 
 1. 先读根目录及目标目录的 `README.md` 索引，快速定位模块职责与文件清单，避免盲目全仓扫描。
-2. 涉及记忆、人格与情绪演化的改动，先读 [docs/design/README.md](docs/design/README.md) 下的对应设计文档。
-3. 整体系统运行时与协议接入架构将补充于 `docs/design/`，在未落地对应设计文档前，不得擅自扩展超出当前任务范围的框架抽象。
+2. 涉及整体运行时、通道协议、AI 三层抽象与 WebUI 边界，先读 [docs/design/architecture.md](docs/design/architecture.md)。
+3. 涉及记忆、人格与情绪演化的改动，先读 [docs/design/memory.md](docs/design/memory.md) 与 [docs/design/persona-and-emotion.md](docs/design/persona-and-emotion.md)，索引见 [docs/design/README.md](docs/design/README.md)。
 
 ## 2. 核心工程原则
 
@@ -57,7 +57,7 @@
 
 ## 6. Svelte 5 前端规范（现代写法）
 
-WebUI 使用 **Svelte 5 + TypeScript（`strict: true`）**：
+WebUI 使用 **Svelte 5 + SvelteKit（`adapter-static` SPA）+ TypeScript（`strict: true`）+ Tailwind CSS v4 + shadcn-svelte**：
 
 - **强制 Runes 与 Snippets**：
   - 状态与派生统一使用 `$state`、`$state.raw`、`$derived`、`$derived.by`；
@@ -72,6 +72,11 @@ WebUI 使用 **Svelte 5 + TypeScript（`strict: true`）**：
   - 能用 `$derived` 表达的计算状态，严禁使用 `$effect` 手动同步；
   - `$effect` 仅用于与外部世界同步（DOM API、定时器、WebSocket / SSE 订阅等），且必须返回清理函数；
   - 前端只负责可视化观测、调试与配置交互，不承载核心业务决策逻辑。
+- **视觉与验收铁律**：
+  - 面向娱乐 Bot 的活泼清新配色，深度覆写 `shadcn-svelte` 默认样式；
+  - **严禁「边框套边框」**，统一用色差/明度对比与留白表达层级；
+  - 文字保持克制（少用冗余副标题和说明段落），善用动效与排版直觉表达逻辑；
+  - 页面开发完成后必须真实运行并截图验收，确保整齐无挤压换行与错位。
 
 ## 7. Git 规范
 
