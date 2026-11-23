@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"omni-bot/internal/protocol"
@@ -305,6 +306,9 @@ type Normalizer struct {
 	maxMediaBytes   int64
 	logger          *slog.Logger
 	now             func() time.Time
+
+	nickMu sync.RWMutex
+	nicks  map[string]string
 }
 
 func NewNormalizer(opts NormalizerOptions) *Normalizer {
@@ -352,6 +356,7 @@ func NewNormalizer(opts NormalizerOptions) *Normalizer {
 		maxMediaBytes:   maxMedia,
 		logger:          logger.With("component", "napcat.normalizer"),
 		now:             nowFn,
+		nicks:           make(map[string]string),
 	}
 }
 
@@ -373,12 +378,16 @@ func (n *Normalizer) NormalizeGroupMessage(ctx context.Context, ev OneBotEvent) 
 		tsMs = n.now().UnixMilli()
 	}
 
-	senderName := firstNonEmpty(ev.Sender.Card, ev.Sender.Nickname, strconv.FormatInt(ev.UserID, 10))
+	senderIDStr := strconv.FormatInt(ev.UserID, 10)
+	senderName := firstNonEmpty(ev.Sender.Card, ev.Sender.Nickname, senderIDStr)
+	if ev.UserID != 0 && senderName != senderIDStr {
+		n.rememberNick(senderIDStr, senderName)
+	}
 	msg := protocol.InboundMessage{
 		ChannelID:   n.channelID,
 		RoomID:      strconv.FormatInt(ev.GroupID, 10),
 		MsgID:       string(ev.MessageID),
-		SenderID:    strconv.FormatInt(ev.UserID, 10),
+		SenderID:    senderIDStr,
 		SenderName:  senderName,
 		IsBot:       ev.SelfID != 0 && ev.UserID == ev.SelfID,
 		TimestampMs: tsMs,
@@ -418,13 +427,19 @@ func (n *Normalizer) normalizeSegments(
 			if qq == "" {
 				continue
 			}
+			targetName := segString(seg.Data, "name")
 			if selfStr != "" && qq == selfStr {
 				isAtBot = true
+				if targetName == "" {
+					targetName = "我"
+				}
+			} else if targetName == "" {
+				targetName = n.lookupNick(qq)
 			}
 			blocks = append(blocks, protocol.ContentBlock{
 				Type:       protocol.BlockMention,
 				TargetID:   qq,
-				TargetName: segString(seg.Data, "name"),
+				TargetName: targetName,
 			})
 
 		case "reply":
@@ -458,6 +473,25 @@ func (n *Normalizer) normalizeSegments(
 		}
 	}
 	return blocks, replyTo, isAtBot
+}
+
+func (n *Normalizer) rememberNick(userID, name string) {
+	if userID == "" || name == "" {
+		return
+	}
+	n.nickMu.Lock()
+	if n.nicks == nil {
+		n.nicks = make(map[string]string)
+	}
+	n.nicks[userID] = name
+	n.nickMu.Unlock()
+}
+
+func (n *Normalizer) lookupNick(userID string) string {
+	n.nickMu.RLock()
+	name := n.nicks[userID]
+	n.nickMu.RUnlock()
+	return name
 }
 
 func (n *Normalizer) normalizeImage(ctx context.Context, data map[string]any) protocol.ContentBlock {

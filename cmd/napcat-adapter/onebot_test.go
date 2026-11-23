@@ -520,3 +520,55 @@ func TestFFmpegTranscoderGracefulWhenMissingOrStandardAudio(t *testing.T) {
 		t.Fatalf("unexpected fallback output: mime=%q", outMIME)
 	}
 }
+
+func TestNormalizerMentionNameResolution(t *testing.T) {
+	t.Parallel()
+
+	norm := NewNormalizer(NormalizerOptions{})
+
+	// First message teaches peer nickname for 3050667529.
+	_, ok, err := norm.NormalizeGroupMessage(t.Context(), OneBotEvent{
+		PostType:    "message",
+		MessageType: "group",
+		SelfID:      2198016861,
+		GroupID:     935279370,
+		UserID:      3050667529,
+		MessageID:   "m1",
+		Sender:      OneBotSender{UserID: 3050667529, Nickname: "小周"},
+		Message:     json.RawMessage(`[{"type":"text","data":{"text":"hi"}}]`),
+	})
+	if err != nil || !ok {
+		t.Fatalf("seed nick failed: ok=%v err=%v", ok, err)
+	}
+
+	// Second message mentions both bot (no name field from NapCat) and peer 3050667529.
+	msg, ok, err := norm.NormalizeGroupMessage(t.Context(), OneBotEvent{
+		PostType:    "message",
+		MessageType: "group",
+		SelfID:      2198016861,
+		GroupID:     935279370,
+		UserID:      10002,
+		MessageID:   "m2",
+		Sender:      OneBotSender{UserID: 10002, Nickname: "阿杰"},
+		Message: json.RawMessage(`[
+			{"type":"at","data":{"qq":"2198016861"}},
+			{"type":"text","data":{"text":" 找下 "}},
+			{"type":"at","data":{"qq":"3050667529"}}
+		]`),
+	})
+	if err != nil || !ok {
+		t.Fatalf("NormalizeGroupMessage failed: ok=%v err=%v", ok, err)
+	}
+	if !msg.IsAtBot {
+		t.Fatal("expected IsAtBot=true")
+	}
+	if len(msg.Blocks) != 3 {
+		t.Fatalf("blocks = %+v, want 3", msg.Blocks)
+	}
+	if msg.Blocks[0].TargetName != "我" {
+		t.Fatalf("self mention TargetName = %q, want 我", msg.Blocks[0].TargetName)
+	}
+	if msg.Blocks[2].TargetName != "小周" {
+		t.Fatalf("peer mention TargetName = %q, want 小周", msg.Blocks[2].TargetName)
+	}
+}

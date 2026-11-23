@@ -45,7 +45,7 @@ const defaultSystemProtocol = `<system_protocol>
 - [voice:<要说的话>]：发送一段语音消息；
 - [react:<msg_id>:<emoji>]：对某条消息贴表情回应；
 - [poke:<user_id>]：轻轻戳一戳某位群友；
-- [silent]：决定本轮保持沉默，不发出任何消息。
+- [silent]：仅在发现插嘴不合时宜或对方明确要求安静时保持沉默（若对方明确 @ 你或向你搭话，请直接自然回应）。
 若需查阅久远记忆、搜索网页或管理表情，请直接调用已注册的工具。严禁输出思考过程或伪造工具结果。
 </system_protocol>`
 
@@ -766,6 +766,9 @@ func (p *Pipeline) contributeTimeline(ctx context.Context, rc *RunContext, draft
 		for _, m := range recent {
 			ts := time.UnixMilli(m.TimestampMs).In(p.location).Format("15:04")
 			speaker := formatSpeakerLabel(m, botName)
+			if m.IsAtBot {
+				speaker += " [@我]"
+			}
 			if m.MsgID != "" {
 				fmt.Fprintf(&sb, "[%s] (id:%s) %s: %s\n", ts, m.MsgID, speaker, strings.TrimSpace(m.RenderedText))
 			} else {
@@ -774,6 +777,17 @@ func (p *Pipeline) contributeTimeline(ctx context.Context, rc *RunContext, draft
 		}
 		sb.WriteString("</recent_timeline>")
 		draft.AddDynamic(sb.String())
+	}
+
+	pendingAtBot := false
+	for _, m := range rc.PendingMessages {
+		if m.IsAtBot {
+			pendingAtBot = true
+			break
+		}
+	}
+	if pendingAtBot {
+		draft.AddDynamic("<mention_signal>\n最新消息中有人直接 @ 提到了我。\n</mention_signal>")
 	}
 
 	// Attach multimodal media parts from pending messages for native or MediaFallback consumption.
@@ -929,16 +943,20 @@ func (p *Pipeline) defaultOnPostRun(ctx context.Context, rc *RunContext) error {
 		rc.FinishedAt = p.clock()
 	}
 
+	postDetail := map[string]any{
+		"status":  string(rc.Status),
+		"actions": len(rc.Actions),
+		"silent":  rc.Silent,
+	}
+	if rc.Status == StatusSilent && strings.TrimSpace(rc.RawOutput) != "" {
+		postDetail["raw_preview"] = truncatePreview(strings.TrimSpace(rc.RawOutput), 160)
+	}
 	postStep := rc.AppendStep(TraceStep{
 		Stage:      StagePostRun,
 		Name:       "deliver_and_record",
 		Status:     postRunStepStatus(rc.Status),
 		DurationMs: time.Since(t0).Milliseconds(),
-		Detail: map[string]any{
-			"status":  string(rc.Status),
-			"actions": len(rc.Actions),
-			"silent":  rc.Silent,
-		},
+		Detail:     postDetail,
 	})
 
 	p.persistRunTrace(ctx, rc)
