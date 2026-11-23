@@ -270,6 +270,8 @@ func importMemes(ctx context.Context, opts Options, report *Report) error {
 				if err != nil {
 					return fmt.Errorf("legacy: decode meme embedding %q: %w", hash, err)
 				}
+				vec = truncateAndNormalize(vec, opts.TargetEmbeddingDim)
+				dim = len(vec)
 			}
 			createdMs := secToMs(createdSec)
 			if err := opts.TargetStore.UpsertMeme(ctx, store.Meme{
