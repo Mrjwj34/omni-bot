@@ -82,6 +82,8 @@ type PipelineConfig struct {
 	BotName             string
 	BotUserID           string
 	GateThreshold       float64
+	GateAtThreshold     float64
+	FreeReplyCooldown   time.Duration
 	RecentTimelineLimit int
 	DistillBatchSize    int
 	MaxSteps            int
@@ -109,6 +111,8 @@ type Pipeline struct {
 	botName             string
 	botUserID           string
 	gateThreshold       float64
+	gateAtThreshold     float64
+	freeReplyCooldown   time.Duration
 	recentTimelineLimit int
 	distillBatchSize    int
 	location            *time.Location
@@ -146,6 +150,10 @@ func NewPipeline(cfg PipelineConfig) (*Pipeline, error) {
 	gateThreshold := cfg.GateThreshold
 	if gateThreshold <= 0 {
 		gateThreshold = defaultGateThreshold
+	}
+	gateAtThreshold := cfg.GateAtThreshold
+	if gateAtThreshold <= 0 {
+		gateAtThreshold = min(0.30, gateThreshold)
 	}
 	recentLimit := cfg.RecentTimelineLimit
 	if recentLimit <= 0 {
@@ -195,6 +203,8 @@ func NewPipeline(cfg PipelineConfig) (*Pipeline, error) {
 		botName:             botName,
 		botUserID:           botUserID,
 		gateThreshold:       gateThreshold,
+		gateAtThreshold:     gateAtThreshold,
+		freeReplyCooldown:   cfg.FreeReplyCooldown,
 		recentTimelineLimit: recentLimit,
 		distillBatchSize:    distillBatch,
 		location:            loc,
@@ -652,11 +662,19 @@ func (p *Pipeline) defaultOnGate(ctx context.Context, rc *RunContext) error {
 					rc.Gate.Bypassed = true
 					rc.Gate.Reason = "bypass_gate"
 				} else {
-					// Fixed gate threshold — strictly NO PAD-based threshold tampering!
-					rc.Gate.ShouldReply = outcome.ShouldReply >= p.gateThreshold
-					if rc.Gate.ShouldReply {
+					// Fixed gate thresholds + optional free-reply cooldown (strictly NO PAD tampering).
+					threshold := p.gateThreshold
+					if isAtBot {
+						threshold = p.gateAtThreshold
+					}
+					if !isAtBot && p.freeReplyCooldown > 0 && p.inFreeReplyCooldown(recent, p.clock()) {
+						rc.Gate.ShouldReply = false
+						rc.Gate.Reason = "cooldown"
+					} else if outcome.ShouldReply >= threshold {
+						rc.Gate.ShouldReply = true
 						rc.Gate.Reason = "decision_pass"
 					} else {
+						rc.Gate.ShouldReply = false
 						rc.Gate.Reason = "decision_skip"
 					}
 				}
@@ -1421,6 +1439,19 @@ func draftToolDefs(spec *RunSpec) []ai.ToolDef {
 		return nil
 	}
 	return spec.ToolDefs
+}
+
+func (p *Pipeline) inFreeReplyCooldown(recent []store.TimelineMessage, now time.Time) bool {
+	if p.freeReplyCooldown <= 0 {
+		return false
+	}
+	for i := len(recent) - 1; i >= 0; i-- {
+		if recent[i].IsBot && recent[i].TimestampMs > 0 {
+			elapsed := now.Sub(time.UnixMilli(recent[i].TimestampMs))
+			return elapsed >= 0 && elapsed < p.freeReplyCooldown
+		}
+	}
+	return false
 }
 
 func randomHex(nBytes int) string {

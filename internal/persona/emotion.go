@@ -463,9 +463,9 @@ func buildGateDecisionQuestions() map[string]ai.DecisionQuestion {
 	return map[string]ai.DecisionQuestion{
 		DecisionKeyShouldReply: {
 			Kind:             ai.DecisionNoul,
-			Instructions:     "结合 <persona_self>、<inner_feeling>（若有）、<earlier_context>、<latest_message> 与 <mention_signal>（若有），判断我此刻是否适合自然接话发言。被 @、被点名、大家热聊可接梗或分享喜讯/吃瓜时倾向发言；不熟的私事、无聊复读刷屏、群友吵架摩擦或深夜道晚安散场时倾向安静不插嘴。",
-			TrueDescription:  "自然适合接话或回应",
-			FalseDescription: "更适合安静看着不插嘴",
+			Instructions:     "结合 <persona_self>、<inner_feeling>（若有）、<earlier_context>、<latest_message> 与 <mention_signal>（若有），判断我此刻是否适合自然接话发言。熟人群聊默认多看少说：仅在被 @、被直接点名提问、大家热聊有明显可接的梗或分享喜讯/吃瓜时倾向发言；如果最新消息只是单个表情包/动画表情、简短附和或无意义水字、我在 <earlier_context> 里刚刚才回过话不想刷屏、或者是不熟的私事/吵架/道晚安散场，必须保持安静不插嘴。",
+			TrueDescription:  "确实值得自然接话或回应",
+			FalseDescription: "保持安静不插嘴（默认偏好）",
 		},
 		DecisionKeyDeltaP: {
 			Kind:         ai.DecisionScore,
