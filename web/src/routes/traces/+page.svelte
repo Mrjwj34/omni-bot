@@ -52,6 +52,7 @@
 	let traces = $state.raw<RunTraceSummary[]>([]);
 	let loadingList = $state(false);
 	let selectedRunId = $state<string | null>(null);
+	let lastUrlRun: string | null = null;
 	let detail = $state<RunTraceDetail | null>(null);
 	let loadingDetail = $state(false);
 	let detailTab = $state('overview');
@@ -171,11 +172,14 @@
 		try {
 			const res = await api.listTraces({ limit: 50 }, { signal });
 			traces = res.items ?? [];
-			const urlRun = page.url.searchParams.get('run');
-			if (urlRun) {
-				selectedRunId = urlRun;
-			} else if (!selectedRunId && traces.length > 0) {
-				selectedRunId = traces[0].run_id;
+			if (!selectedRunId) {
+				const urlRun = page.url.searchParams.get('run');
+				if (urlRun) {
+					lastUrlRun = urlRun;
+					selectedRunId = urlRun;
+				} else if (traces.length > 0) {
+					selectedRunId = traces[0].run_id;
+				}
 			}
 		} catch {
 			// Standalone offline fallback keeps UI clean.
@@ -205,7 +209,8 @@
 
 	$effect(() => {
 		const urlRun = page.url.searchParams.get('run');
-		if (urlRun && urlRun !== selectedRunId) {
+		if (urlRun && urlRun !== lastUrlRun) {
+			lastUrlRun = urlRun;
 			selectedRunId = urlRun;
 		}
 	});
