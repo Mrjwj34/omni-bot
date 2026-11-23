@@ -335,6 +335,14 @@ export interface MCPServerConfig {
 	status?: 'connected' | 'disconnected' | 'error';
 }
 
+export interface BehaviorConfig {
+	bot_name: string;
+	bot_aliases: string;
+	gate_threshold: number;
+	gate_at_threshold: number;
+	debounce_ms: number;
+}
+
 export interface RuntimeConfig {
 	providers: ProviderConfig[];
 	model_slots: ModelSlotConfig[];
@@ -343,8 +351,10 @@ export interface RuntimeConfig {
 		memory_enabled: boolean;
 		emotion_enabled: boolean;
 		meme_collect_enabled: boolean;
+		voice_enabled?: boolean;
 		bash_enabled: boolean;
 	};
+	behavior?: BehaviorConfig;
 }
 
 export interface ProviderUpdateInput {
@@ -361,6 +371,7 @@ export interface RuntimeConfigPatch {
 	model_slots?: ModelSlotConfig[];
 	mcp_servers?: MCPServerConfig[];
 	features?: Partial<RuntimeConfig['features']>;
+	behavior?: Partial<BehaviorConfig>;
 }
 
 export interface TimelineMessage {

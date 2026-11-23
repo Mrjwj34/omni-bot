@@ -13,6 +13,7 @@
 		Save,
 		Server,
 		ShieldCheck,
+		SlidersHorizontal,
 		SmilePlus,
 		Terminal,
 		Trash2
@@ -74,6 +75,14 @@
 		meme_collect_enabled: boolean;
 		voice_enabled: boolean;
 		bash_enabled: boolean;
+	}
+
+	interface EditableBehavior {
+		bot_name: string;
+		bot_aliases: string;
+		gate_threshold: string;
+		gate_at_threshold: string;
+		debounce_ms: string;
 	}
 
 	const PROVIDER_KINDS = ['gemini', 'openai', 'fishaudio', 'whisper', 'custom'] as const;
@@ -162,6 +171,14 @@
 		bash_enabled: false
 	};
 
+	const DEFAULT_BEHAVIOR: EditableBehavior = {
+		bot_name: 'bk101',
+		bot_aliases: 'bk101|101',
+		gate_threshold: '0.70',
+		gate_at_threshold: '0.30',
+		debounce_ms: '1400'
+	};
+
 	let tab = $state('providers');
 	let loading = $state(false);
 	let saving = $state(false);
@@ -181,6 +198,7 @@
 	let slots = $state<EditableSlot[]>(createDefaultSlots());
 	let mcpServers = $state<EditableMCPServer[]>([]);
 	let features = $state<EditableFeatures>({ ...DEFAULT_FEATURES });
+	let behavior = $state<EditableBehavior>({ ...DEFAULT_BEHAVIOR });
 	let sandboxWorkspace = $state('data/sandbox');
 	let savedSnapshot = $state('');
 
@@ -188,7 +206,7 @@
 	let deleteSecretDialogOpen = $state(false);
 
 	let currentSnapshot = $derived(
-		JSON.stringify({ providers, slots, mcpServers, features })
+		JSON.stringify({ providers, slots, mcpServers, features, behavior })
 	);
 	let isDirty = $derived(savedSnapshot !== '' && currentSnapshot !== savedSnapshot);
 
@@ -213,7 +231,7 @@
 	let tabs = $derived<TabItem[]>([
 		{ value: 'providers', label: '供应商与密钥', badge: providers.length },
 		{ value: 'slots', label: '模型槽位', badge: slots.length },
-		{ value: 'mcp', label: 'MCP 与沙箱', badge: mcpServers.length }
+		{ value: 'mcp', label: '行为与扩展', badge: mcpServers.length }
 	]);
 
 	function flash(tone: BadgeTone, text: string): void {
@@ -284,6 +302,16 @@
 			};
 		}
 
+		if (raw.behavior) {
+			behavior = {
+				bot_name: raw.behavior.bot_name || DEFAULT_BEHAVIOR.bot_name,
+				bot_aliases: raw.behavior.bot_aliases ?? DEFAULT_BEHAVIOR.bot_aliases,
+				gate_threshold: Number(raw.behavior.gate_threshold ?? 0.7).toFixed(2),
+				gate_at_threshold: Number(raw.behavior.gate_at_threshold ?? 0.3).toFixed(2),
+				debounce_ms: String(Math.round(Number(raw.behavior.debounce_ms ?? 1400)))
+			};
+		}
+
 		if (raw.sandbox_workspace) {
 			sandboxWorkspace = raw.sandbox_workspace;
 		}
@@ -291,7 +319,7 @@
 			secrets = raw.secrets;
 		}
 
-		savedSnapshot = JSON.stringify({ providers, slots, mcpServers, features });
+		savedSnapshot = JSON.stringify({ providers, slots, mcpServers, features, behavior });
 	}
 
 	async function loadSecrets(signal?: AbortSignal): Promise<void> {
@@ -317,7 +345,7 @@
 		} catch {
 			// Standalone preview or offline kernel: preserve editable default structure.
 			if (!savedSnapshot) {
-				savedSnapshot = JSON.stringify({ providers, slots, mcpServers, features });
+				savedSnapshot = JSON.stringify({ providers, slots, mcpServers, features, behavior });
 			}
 		} finally {
 			loading = false;
@@ -530,8 +558,15 @@
 					emotion_enabled: features.emotion_enabled,
 					meme_collect_enabled: features.meme_collect_enabled,
 					bash_enabled: features.bash_enabled,
-					...(features.voice_enabled ? { voice_enabled: true } : { voice_enabled: false })
-				} as RuntimeConfigPatch['features']
+					voice_enabled: features.voice_enabled
+				},
+				behavior: {
+					bot_name: behavior.bot_name.trim() || DEFAULT_BEHAVIOR.bot_name,
+					bot_aliases: behavior.bot_aliases.trim(),
+					gate_threshold: Math.min(1, Math.max(0.05, Number.parseFloat(behavior.gate_threshold) || 0.7)),
+					gate_at_threshold: Math.min(1, Math.max(0.05, Number.parseFloat(behavior.gate_at_threshold) || 0.3)),
+					debounce_ms: Math.min(10000, Math.max(0, Math.round(Number.parseFloat(behavior.debounce_ms) || 0)))
+				}
 			};
 
 			const updated = await api.updateConfig(patch);
@@ -907,6 +942,61 @@
 				</div>
 			{:else if activeTab === 'mcp'}
 				<div class="space-y-4">
+					<!-- Group Chat Behavior, Gate Thresholds & Debounce (SQLite hot-reload) -->
+					<SurfaceCard variant="raised" padding="lg" class="space-y-4">
+						<div class="flex flex-wrap items-center justify-between gap-2">
+							<div class="flex flex-wrap items-center gap-2.5">
+								<span class="flex size-8 items-center justify-center rounded-xl bg-tint-mint text-mint-600">
+									<SlidersHorizontal class="size-4" />
+								</span>
+								<h2 class="text-sm font-semibold text-ink-primary">群聊行为与门控</h2>
+								<Badge tone="mint" size="sm">SQLite 热生效</Badge>
+							</div>
+							<Badge tone="neutral" size="sm">单槽最新聚合 · 无冷却计时器</Badge>
+						</div>
+
+						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+							<label class="space-y-1">
+								<span class="text-[11px] font-medium text-ink-muted">Bot 昵称</span>
+								<Input bind:value={behavior.bot_name} placeholder="bk101" />
+							</label>
+							<label class="space-y-1">
+								<span class="text-[11px] font-medium text-ink-muted">常用称呼（| 分隔）</span>
+								<Input bind:value={behavior.bot_aliases} placeholder="bk101|101" />
+							</label>
+							<label class="space-y-1">
+								<span class="text-[11px] font-medium text-ink-muted">自由接话阈值 (0~1)</span>
+								<Input
+									type="number"
+									min="0.05"
+									max="1"
+									step="0.05"
+									bind:value={behavior.gate_threshold}
+								/>
+							</label>
+							<label class="space-y-1">
+								<span class="text-[11px] font-medium text-ink-muted">@提及阈值 (0~1)</span>
+								<Input
+									type="number"
+									min="0.05"
+									max="1"
+									step="0.05"
+									bind:value={behavior.gate_at_threshold}
+								/>
+							</label>
+							<label class="space-y-1">
+								<span class="text-[11px] font-medium text-ink-muted">防抖聚合 (ms)</span>
+								<Input
+									type="number"
+									min="0"
+									max="10000"
+									step="100"
+									bind:value={behavior.debounce_ms}
+								/>
+							</label>
+						</div>
+					</SurfaceCard>
+
 					<!-- Prominent Playful Sandboxed Bash & File Tools Toggle -->
 					<SurfaceCard
 						variant={features.bash_enabled ? 'tint-amber' : 'raised'}
