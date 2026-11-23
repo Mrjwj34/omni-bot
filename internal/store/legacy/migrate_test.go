@@ -241,7 +241,7 @@ func TestMigrateLegacyFixtureAndIdempotency(t *testing.T) {
 
 	// Verify persona preservation & 1st-person 3-layer defaults
 	core, ok, err := targetStore.GetPersonaCore(ctx, store.DefaultPersonaRoomID)
-	if err != nil || !ok || core.LegacyPrompt != legacyPrompt || !strings.Contains(core.Beliefs, "我是常驻在这个熟人") {
+	if err != nil || !ok || core.LegacyPrompt != legacyPrompt || !strings.Contains(core.Beliefs, "我平时就在这个熟人") {
 		t.Fatalf("migrated persona core = (%+v, %v, %v)", core, ok, err)
 	}
 	snaps, err := targetStore.ListPersonaSnapshots(ctx, 10)
