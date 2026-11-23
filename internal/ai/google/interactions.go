@@ -222,8 +222,11 @@ func (m *LanguageModel) buildSingleContent(ctx context.Context, p ai.Part) (inte
 }
 
 func buildFunctionResultStep(provider string, tr *ai.ToolResult) (interactions.FunctionResultStep, error) {
-	var union interactions.FunctionResultStepResultUnion
-	if tr.Data != nil {
+	// Gemini Interactions API treats JSON arrays in FunctionResultStep.Result as typed []Content
+	// (requiring a "type" field per element); sending a plain string avoids schema rejection for
+	// slice-shaped structured tool outputs while preserving full readable content.
+	resultText := tr.Content
+	if resultText == "" && tr.Data != nil {
 		raw, err := json.Marshal(tr.Data)
 		if err != nil {
 			return interactions.FunctionResultStep{}, &ai.Error{
@@ -233,10 +236,9 @@ func buildFunctionResultStep(provider string, tr *ai.ToolResult) (interactions.F
 				Err:      err,
 			}
 		}
-		union = interactions.NewFunctionResultStepResultUnionUnknown(raw)
-	} else {
-		union = interactions.NewFunctionResultStepResultUnion(tr.Content)
+		resultText = string(raw)
 	}
+	union := interactions.NewFunctionResultStepResultUnion(resultText)
 
 	step := interactions.FunctionResultStep{
 		CallID: tr.CallID,
