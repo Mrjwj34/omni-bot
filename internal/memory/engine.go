@@ -22,14 +22,14 @@ const (
 
 	defaultHalfLifeDays             = 14.0
 	defaultPowerLawAlpha            = 0.85
-	defaultVectorWeight             = 0.75
+	defaultVectorWeight             = 0.95
 	defaultPassiveTopK              = 4
-	defaultPassiveMinVectorSim      = float32(0.50)
-	defaultPassiveSurfaceThreshold  = 0.54
+	defaultPassiveMinVectorSim      = float32(0.48)
+	defaultPassiveSurfaceThreshold  = 0.36
 	defaultInWindowOverlapThreshold = 0.65
 	defaultActiveLimit              = 8
-	defaultActiveMinVectorSim       = float32(0.46)
-	defaultActiveSurfaceThreshold   = 0.40
+	defaultActiveMinVectorSim       = float32(0.42)
+	defaultActiveSurfaceThreshold   = 0.24
 	defaultReinforceCooldown        = 30 * time.Minute
 )
 
@@ -752,10 +752,12 @@ func (e *Engine) vectorActivation(sim, minSim float32) float64 {
 	if norm > 1.0 {
 		norm = 1.0
 	}
-	if norm <= 0 {
+	if norm < 0 {
 		return 0
 	}
-	return e.cfg.VectorWeight * norm
+	// Passing minSim already indicates meaningful semantic match; apply a 0.35 base floor so
+	// fresh/migrated memories (importance=5, recall_count=0) aren't crushed to zero near the cutoff.
+	return e.cfg.VectorWeight * (0.35 + 0.65*norm)
 }
 
 func (e *Engine) scoreCandidates(cands map[string]*recallCandidate, nowMs int64, threshold float64, coldSearch bool) []RecallHit {
