@@ -511,31 +511,33 @@ func (rt *Runtime) handleListMemories(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	roomID := strings.TrimSpace(r.URL.Query().Get("room_id"))
 	kindFilter := strings.TrimSpace(r.URL.Query().Get("kind"))
-	limit := parseLimit(r, 50, 200)
+	limit := parseLimit(r, 200, 500)
 
-	vecs, err := rt.Store.LoadActiveMemoryVectors(ctx, roomID)
+	allMems, err := rt.Store.ListMemories(ctx, roomID, true, limit)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	nowMs := rt.clock().UnixMilli()
-	items := make([]APIMemoryItem, 0, min(limit, len(vecs)))
-	for _, mv := range vecs {
-		if kindFilter != "" && !memoryKindMatches(mv.Kind, kindFilter) {
-			continue
-		}
-		m, ok, err := rt.Store.GetMemory(ctx, mv.ID)
-		if err != nil || !ok {
+	items := make([]APIMemoryItem, 0, len(allMems))
+	for _, m := range allMems {
+		if kindFilter != "" && !memoryKindMatches(m.Kind, kindFilter) {
 			continue
 		}
 		items = append(items, toAPIMemory(m, nowMs, rt.location))
-		if len(items) >= limit {
-			break
-		}
+	}
+
+	aliases, err := rt.Store.ListEntityAliases(ctx, roomID)
+	if err != nil {
+		aliases = nil
+	}
+	if aliases == nil {
+		aliases = []store.EntityAlias{}
 	}
 
 	writeAPIJSON(w, http.StatusOK, map[string]any{
 		"items":    items,
+		"aliases":  aliases,
 		"dreaming": rt.DreamingStatus(ctx, roomID),
 	})
 }
@@ -605,8 +607,8 @@ func (rt *Runtime) handleTriggerDreaming(w http.ResponseWriter, r *http.Request)
 	if r.Body != nil {
 		_ = json.NewDecoder(io.LimitReader(r.Body, 16<<10)).Decode(&body)
 	}
-	accepted := rt.TriggerDreaming(body.RoomID)
-	writeAPIJSON(w, http.StatusAccepted, map[string]bool{"accepted": accepted})
+	res := rt.RunDreamingNow(r.Context(), body.RoomID)
+	writeAPIJSON(w, http.StatusAccepted, res)
 }
 
 func (rt *Runtime) handleListAliases(w http.ResponseWriter, r *http.Request) {

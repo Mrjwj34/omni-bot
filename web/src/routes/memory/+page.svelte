@@ -223,14 +223,27 @@
 		dreamToast = null;
 		try {
 			const res = await api.triggerDreaming();
-			dreamToast = {
-				tone: 'mint',
-				text: res.accepted ? 'Dreaming 后台巩固已触发' : 'Dreaming 已在运行中'
-			};
-			if (dreaming) {
-				dreaming = { ...dreaming, running: true };
+			if (res.dreaming) {
+				dreaming = res.dreaming;
 			}
-			void loadMemories();
+			const merged = res.superseded_count ?? 0;
+			const archived = res.archived_count ?? 0;
+			const aliases = res.aliases_synced ?? 0;
+			const totalConsolidated = res.dreaming?.consolidated_count ?? dreaming?.consolidated_count ?? 0;
+			if (!res.accepted) {
+				dreamToast = { tone: 'mint', text: 'Dreaming 正在运行中，请稍候' };
+			} else if (merged > 0 || archived > 0 || aliases > 0) {
+				dreamToast = {
+					tone: 'mint',
+					text: `Dreaming 完成：归并 ${merged} 条 · 归档 ${archived} 条 · 同步 ${aliases} 个别名`
+				};
+			} else {
+				dreamToast = {
+					tone: 'mint',
+					text: `Dreaming 完成：暂无新的重复或待归档记忆（累计已归并 ${totalConsolidated} 条）`
+				};
+			}
+			await loadMemories();
 		} catch (err) {
 			dreamToast = {
 				tone: 'rose',

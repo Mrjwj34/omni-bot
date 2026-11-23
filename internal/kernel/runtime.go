@@ -613,6 +613,69 @@ func (rt *Runtime) HandleRunTrigger(_ context.Context, params protocol.RunTrigge
 	})
 }
 
+// DreamingRunResult summarizes one completed manual Dreaming consolidation pass.
+type DreamingRunResult struct {
+	Accepted        bool              `json:"accepted"`
+	SupersededCount int               `json:"superseded_count"`
+	ArchivedCount   int               `json:"archived_count"`
+	AliasesSynced   int               `json:"aliases_synced"`
+	Dreaming        APIDreamingStatus `json:"dreaming"`
+}
+
+// RunDreamingNow executes Dreaming consolidation synchronously under ctx, updating DreamingStatus
+// and returning exact consolidation counts for immediate UI feedback.
+func (rt *Runtime) RunDreamingNow(ctx context.Context, roomID string) DreamingRunResult {
+	if rt.Memory == nil {
+		return DreamingRunResult{Accepted: false, Dreaming: rt.DreamingStatus(ctx, roomID)}
+	}
+	rt.dreamMu.Lock()
+	if rt.dreamStatus.Running {
+		rt.dreamMu.Unlock()
+		return DreamingRunResult{Accepted: false, Dreaming: rt.DreamingStatus(ctx, roomID)}
+	}
+	rt.dreamStatus.Running = true
+	rt.dreamMu.Unlock()
+
+	defer func() {
+		rt.dreamMu.Lock()
+		rt.dreamStatus.Running = false
+		rt.dreamStatus.LastRunAt = rt.clock().UTC().Format(time.RFC3339)
+		rt.dreamMu.Unlock()
+	}()
+
+	runCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	rooms := rt.collectDreamRooms(runCtx, roomID)
+	var superseded, archived, aliases int
+	for _, rid := range rooms {
+		rep, err := rt.Memory.RunDreaming(runCtx, rid, memory.DreamingOptions{
+			NowMs: rt.clock().UnixMilli(),
+		})
+		if err != nil {
+			rt.logger.Warn("manual dreaming failed", "room_id", rid, "err", err)
+			continue
+		}
+		superseded += rep.SupersededCount
+		archived += rep.ArchivedCount
+		aliases += rep.AliasesSynced
+	}
+
+	rt.dreamMu.Lock()
+	rt.dreamStatus.ConsolidatedCount += superseded + archived
+	rt.dreamStatus.Running = false
+	rt.dreamStatus.LastRunAt = rt.clock().UTC().Format(time.RFC3339)
+	rt.dreamMu.Unlock()
+
+	return DreamingRunResult{
+		Accepted:        true,
+		SupersededCount: superseded,
+		ArchivedCount:   archived,
+		AliasesSynced:   aliases,
+		Dreaming:        rt.DreamingStatus(ctx, roomID),
+	}
+}
+
 // TriggerDreaming starts a non-blocking background Dreaming consolidation pass.
 func (rt *Runtime) TriggerDreaming(roomID string) bool {
 	if rt.Memory == nil {

@@ -441,16 +441,29 @@ func (s *Store) UpsertEntityAlias(ctx context.Context, alias EntityAlias) error 
 	return nil
 }
 
-// ListEntityAliases lists all alias mappings for roomID.
+// ListEntityAliases lists alias mappings for roomID, or across all rooms when roomID is empty.
 func (s *Store) ListEntityAliases(ctx context.Context, roomID string) ([]EntityAlias, error) {
-	rows, err := s.readDB.QueryContext(
-		ctx,
-		`SELECT room_id, alias, canonical_entity, sender_id, updated_at_ms
-		 FROM entity_aliases
-		 WHERE room_id = ?
-		 ORDER BY alias ASC`,
-		roomID,
+	var (
+		rows *sql.Rows
+		err  error
 	)
+	if strings.TrimSpace(roomID) == "" {
+		rows, err = s.readDB.QueryContext(
+			ctx,
+			`SELECT room_id, alias, canonical_entity, sender_id, updated_at_ms
+			 FROM entity_aliases
+			 ORDER BY canonical_entity ASC, alias ASC`,
+		)
+	} else {
+		rows, err = s.readDB.QueryContext(
+			ctx,
+			`SELECT room_id, alias, canonical_entity, sender_id, updated_at_ms
+			 FROM entity_aliases
+			 WHERE room_id = ?
+			 ORDER BY canonical_entity ASC, alias ASC`,
+			roomID,
+		)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("store: list entity aliases: %w", err)
 	}
@@ -466,6 +479,61 @@ func (s *Store) ListEntityAliases(ctx context.Context, roomID string) ([]EntityA
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("store: iterate entity aliases: %w", err)
+	}
+	return out, nil
+}
+
+// ListMemories returns memories for roomID (or all rooms when empty), optionally including archived/superseded rows.
+func (s *Store) ListMemories(ctx context.Context, roomID string, includeInactive bool, limit int) ([]Memory, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	var conds []string
+	var args []any
+	if r := strings.TrimSpace(roomID); r != "" {
+		conds = append(conds, "room_id = ?")
+		args = append(args, r)
+	}
+	if !includeInactive {
+		conds = append(conds, "archived = 0", "superseded_by = ''")
+	}
+	query := `SELECT id, room_id, kind, content, t_event_ms, created_at_ms, updated_at_ms,
+	                 last_recalled_ms, recall_count, importance, superseded_by, archived
+	          FROM memories`
+	if len(conds) > 0 {
+		query += " WHERE " + strings.Join(conds, " AND ")
+	}
+	query += ` ORDER BY archived ASC, (superseded_by != '') ASC, updated_at_ms DESC LIMIT ?`
+	args = append(args, limit)
+
+	rows, err := s.readDB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("store: list memories: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Memory
+	for rows.Next() {
+		var m Memory
+		var archived int
+		if err := rows.Scan(
+			&m.ID, &m.RoomID, &m.Kind, &m.Content, &m.TEventMs, &m.CreatedAtMs, &m.UpdatedAtMs,
+			&m.LastRecalledMs, &m.RecallCount, &m.Importance, &m.SupersededBy, &archived,
+		); err != nil {
+			return nil, fmt.Errorf("store: scan memory row: %w", err)
+		}
+		m.Archived = archived != 0
+		out = append(out, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: iterate memories: %w", err)
+	}
+	for i := range out {
+		ents, err := s.loadMemoryEntities(ctx, out[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		out[i].Entities = ents
 	}
 	return out, nil
 }

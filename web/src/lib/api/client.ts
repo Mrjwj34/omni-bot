@@ -120,8 +120,14 @@ export const api = {
 		);
 	},
 
-	triggerDreaming(opts?: RequestOptions): Promise<{ accepted: boolean }> {
-		return requestJSON<{ accepted: boolean }>('/api/memories/dream', { method: 'POST' }, opts);
+	triggerDreaming(opts?: RequestOptions): Promise<{
+		accepted: boolean;
+		superseded_count?: number;
+		archived_count?: number;
+		aliases_synced?: number;
+		dreaming?: import('./types').DreamingStatus;
+	}> {
+		return requestJSON('/api/memories/dream', { method: 'POST' }, opts);
 	},
 
 	getPersona(opts?: RequestOptions): Promise<PersonaResponse> {

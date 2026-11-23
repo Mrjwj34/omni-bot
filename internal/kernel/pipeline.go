@@ -1125,7 +1125,9 @@ func (p *Pipeline) persistRunTrace(ctx context.Context, rc *RunContext) {
 		ActionsJSON:   string(actionsBytes),
 		ErrorText:     rc.Error,
 	}
-	if err := p.store.UpsertRunTrace(ctx, trace); err != nil {
+	saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+	defer cancel()
+	if err := p.store.UpsertRunTrace(saveCtx, trace); err != nil {
 		p.logger.Warn("failed to persist run trace", "run_id", rc.RunID, "err", err)
 	}
 }
