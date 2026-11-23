@@ -215,6 +215,16 @@
 		}
 	});
 
+	let lastLiveFinishedId: string | null = null;
+	$effect(() => {
+		const live = realtime.activeRun;
+		if (!live) return;
+		if ((live.stage === 'done' || live.stage === 'error') && live.run_id !== lastLiveFinishedId) {
+			lastLiveFinishedId = live.run_id;
+			void loadTraces();
+		}
+	});
+
 	$effect(() => {
 		const id = activeSummary?.run_id;
 		if (!id) {
