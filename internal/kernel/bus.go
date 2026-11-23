@@ -75,6 +75,16 @@ func NewSingleFlightBus(runFn RunFunc, opts BusOptions) (*SingleFlightBus, error
 	}, nil
 }
 
+// SetDebounceWindow updates the debounce window dynamically without disrupting active runs.
+func (b *SingleFlightBus) SetDebounceWindow(d time.Duration) {
+	if d < 0 {
+		d = 0
+	}
+	b.mu.Lock()
+	b.debounceWindow = d
+	b.mu.Unlock()
+}
+
 // Submit schedules ev on the room's single-flight lane without blocking on Run execution.
 func (b *SingleFlightBus) Submit(ev TriggerEvent) error {
 	_, err := b.submit(ev, false)
@@ -255,12 +265,32 @@ func (b *SingleFlightBus) runRoomLoop(roomID string, initial TriggerEvent) {
 			return
 		}
 
-		// Promote coalesced pending micro-batch into the next serialized run.
+		// Queue length is strictly 1 (latest-state coalescing): if messages arrived while this Run
+		// was executing, re-arm the debounce window for remaining time so bursts (e.g. msg3, msg4)
+		// settle into a single latest checkpoint instead of firing stale back-to-back runs.
 		ev = slot.pendingEvent
 		slot.pending = false
 		slot.pendingEvent = TriggerEvent{}
-		slot.currentWaiters = slot.pendingWaiters
+		pendingWaiters := slot.pendingWaiters
 		slot.pendingWaiters = nil
+
+		if b.debounceWindow > 0 && ev.Source == TriggerMessage && !ev.BypassGate {
+			waitFor := b.debounceWindow - time.Since(ev.ReceivedAt)
+			if waitFor > 25*time.Millisecond {
+				slot.running = false
+				slot.hasDebounce = true
+				slot.debounceEvent = ev
+				slot.pendingWaiters = pendingWaiters
+				rid := roomID
+				slot.debounceTimer = time.AfterFunc(waitFor, func() {
+					b.fireDebounce(rid)
+				})
+				b.mu.Unlock()
+				return
+			}
+		}
+
+		slot.currentWaiters = pendingWaiters
 		b.mu.Unlock()
 	}
 }

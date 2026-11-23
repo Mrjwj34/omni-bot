@@ -163,6 +163,92 @@ func TestSingleFlightBus_DebounceAndBypass(t *testing.T) {
 	}
 }
 
+func TestSingleFlightBus_PostRunPendingCoalescesWithRemainingDebounce(t *testing.T) {
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	secondDone := make(chan time.Time, 1)
+
+	var (
+		mu       sync.Mutex
+		runs     int
+		payloads []string
+	)
+
+	bus, err := NewSingleFlightBus(func(ctx context.Context, ev TriggerEvent) error {
+		mu.Lock()
+		runs++
+		n := runs
+		if s, ok := ev.Payload.(string); ok {
+			payloads = append(payloads, s)
+		}
+		mu.Unlock()
+
+		if n == 1 {
+			close(firstStarted)
+			<-releaseFirst
+			return nil
+		}
+		secondDone <- time.Now()
+		return nil
+	}, BusOptions{DebounceWindow: 120 * time.Millisecond})
+	if err != nil {
+		t.Fatalf("NewSingleFlightBus: %v", err)
+	}
+	defer func() { _ = bus.Close(t.Context()) }()
+
+	// Launch msg2 immediately via BypassGate to simulate an active run.
+	if err := bus.Submit(TriggerEvent{
+		Source:     TriggerMessage,
+		RoomID:     "room-q1",
+		BypassGate: true,
+		Payload:    "msg2",
+	}); err != nil {
+		t.Fatalf("submit msg2: %v", err)
+	}
+	<-firstStarted
+
+	// While msg2 is running, msg3 and msg4 arrive; queue length is strictly 1 (latest state wins).
+	if err := bus.Submit(TriggerEvent{
+		Source:     TriggerMessage,
+		RoomID:     "room-q1",
+		ReceivedAt: time.Now(),
+		Payload:    "msg3",
+	}); err != nil {
+		t.Fatalf("submit msg3: %v", err)
+	}
+	time.Sleep(15 * time.Millisecond)
+	msg4At := time.Now()
+	if err := bus.Submit(TriggerEvent{
+		Source:     TriggerMessage,
+		RoomID:     "room-q1",
+		ReceivedAt: msg4At,
+		Payload:    "msg4",
+	}); err != nil {
+		t.Fatalf("submit msg4: %v", err)
+	}
+
+	close(releaseFirst)
+
+	select {
+	case firedAt := <-secondDone:
+		if elapsed := firedAt.Sub(msg4At); elapsed < 80*time.Millisecond {
+			t.Fatalf("follow-up run fired too early (%v after msg4), expected remaining debounce", elapsed)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for coalesced follow-up run")
+	}
+
+	time.Sleep(80 * time.Millisecond)
+	mu.Lock()
+	defer mu.Unlock()
+	if runs != 2 {
+		t.Fatalf("total runs = %d, want 2 (msg2 + single coalesced follow-up for msg3/msg4)", runs)
+	}
+	if len(payloads) != 2 || payloads[1] != "msg4" {
+		t.Fatalf("payloads = %v, want [msg2 msg4]", payloads)
+	}
+}
+
 func TestSingleFlightBus_CloseCancelsInFlightAndRejectsNew(t *testing.T) {
 	entered := make(chan struct{})
 	canceled := make(chan struct{})

@@ -79,11 +79,11 @@ type PipelineConfig struct {
 	Memes               *meme.Vault
 	ToolsProvider       func(roomID string) (*tools.Registry, func())
 	FeatureFlags        func() store.FeatureFlags
+	BehaviorConfig      func() store.BehaviorConfig
 	BotName             string
 	BotUserID           string
 	GateThreshold       float64
 	GateAtThreshold     float64
-	FreeReplyCooldown   time.Duration
 	RecentTimelineLimit int
 	DistillBatchSize    int
 	MaxSteps            int
@@ -108,11 +108,11 @@ type Pipeline struct {
 	memes               *meme.Vault
 	toolsProvider       func(roomID string) (*tools.Registry, func())
 	featureFlags        func() store.FeatureFlags
+	behaviorConfig      func() store.BehaviorConfig
 	botName             string
 	botUserID           string
 	gateThreshold       float64
 	gateAtThreshold     float64
-	freeReplyCooldown   time.Duration
 	recentTimelineLimit int
 	distillBatchSize    int
 	location            *time.Location
@@ -200,11 +200,11 @@ func NewPipeline(cfg PipelineConfig) (*Pipeline, error) {
 		memes:               cfg.Memes,
 		toolsProvider:       cfg.ToolsProvider,
 		featureFlags:        flagsFn,
+		behaviorConfig:      cfg.BehaviorConfig,
 		botName:             botName,
 		botUserID:           botUserID,
 		gateThreshold:       gateThreshold,
 		gateAtThreshold:     gateAtThreshold,
-		freeReplyCooldown:   cfg.FreeReplyCooldown,
 		recentTimelineLimit: recentLimit,
 		distillBatchSize:    distillBatch,
 		location:            loc,
@@ -314,7 +314,8 @@ func (p *Pipeline) HandleInbound(ctx context.Context, msg protocol.InboundMessag
 		ChannelID:  msg.ChannelID,
 		RoomID:     msg.RoomID,
 		BypassGate: false,
-		ReceivedAt: time.UnixMilli(msg.TimestampMs),
+		// Use local kernel arrival time so remote platform timestamp skew never short-circuits debounce.
+		ReceivedAt: p.clock(),
 	})
 }
 
@@ -492,14 +493,22 @@ func (p *Pipeline) defaultOnGate(ctx context.Context, rc *RunContext) error {
 			earlierMsgs = append(earlierMsgs, m)
 		}
 	}
-	if len(pendingMsgs) == 0 && len(recent) > 0 {
-		// Manual/scheduled trigger with no unread messages: treat the tail message as latest context.
-		last := recent[len(recent)-1]
-		pendingMsgs = []store.TimelineMessage{last}
-		if len(earlierMsgs) > 0 && earlierMsgs[len(earlierMsgs)-1].SeqID == last.SeqID {
-			earlierMsgs = earlierMsgs[:len(earlierMsgs)-1]
+	if len(pendingMsgs) == 0 {
+		if rc.Trigger.Source == TriggerMessage && !rc.Trigger.BypassGate {
+			// Nothing unprocessed left (already coalesced by an earlier run); skip with zero LLM calls.
+			rc.Gate.ShouldReply = false
+			rc.Gate.Reason = "no_unprocessed"
+			return nil
 		}
-		isAtBot = last.IsAtBot
+		if len(recent) > 0 {
+			// Manual/scheduled trigger with no unread messages: treat the tail message as latest context.
+			last := recent[len(recent)-1]
+			pendingMsgs = []store.TimelineMessage{last}
+			if len(earlierMsgs) > 0 && earlierMsgs[len(earlierMsgs)-1].SeqID == last.SeqID {
+				earlierMsgs = earlierMsgs[:len(earlierMsgs)-1]
+			}
+			isAtBot = last.IsAtBot
+		}
 	}
 	rc.PendingMessages = pendingMsgs
 
@@ -521,8 +530,9 @@ func (p *Pipeline) defaultOnGate(ctx context.Context, rc *RunContext) error {
 		}
 	}
 
-	earlierLines := formatTimelineLines(earlierMsgs, p.botName)
-	latestLines := formatTimelineLines(pendingMsgs, p.botName)
+	botName := p.resolveBotName()
+	earlierLines := formatTimelineLines(earlierMsgs, botName)
+	latestLines := formatTimelineLines(pendingMsgs, botName)
 	queryText := buildQueryText(pendingMsgs)
 	rc.Gate.QueryText = queryText
 
@@ -662,15 +672,12 @@ func (p *Pipeline) defaultOnGate(ctx context.Context, rc *RunContext) error {
 					rc.Gate.Bypassed = true
 					rc.Gate.Reason = "bypass_gate"
 				} else {
-					// Fixed gate thresholds + optional free-reply cooldown (strictly NO PAD tampering).
-					threshold := p.gateThreshold
+					// Pure threshold + prompt gate loaded dynamically from SQLite config (NO cooldown, NO PAD tampering).
+					threshold, atThreshold := p.resolveGateThresholds()
 					if isAtBot {
-						threshold = p.gateAtThreshold
+						threshold = atThreshold
 					}
-					if !isAtBot && p.freeReplyCooldown > 0 && p.inFreeReplyCooldown(recent, p.clock()) {
-						rc.Gate.ShouldReply = false
-						rc.Gate.Reason = "cooldown"
-					} else if outcome.ShouldReply >= threshold {
+					if outcome.ShouldReply >= threshold {
 						rc.Gate.ShouldReply = true
 						rc.Gate.Reason = "decision_pass"
 					} else {
@@ -753,11 +760,12 @@ func (p *Pipeline) contributeTimeline(ctx context.Context, rc *RunContext, draft
 	}
 
 	if len(recent) > 0 {
+		botName := p.resolveBotName()
 		var sb strings.Builder
 		sb.WriteString("<recent_timeline>\n")
 		for _, m := range recent {
 			ts := time.UnixMilli(m.TimestampMs).In(p.location).Format("15:04")
-			speaker := formatSpeakerLabel(m, p.botName)
+			speaker := formatSpeakerLabel(m, botName)
 			if m.MsgID != "" {
 				fmt.Fprintf(&sb, "[%s] (id:%s) %s: %s\n", ts, m.MsgID, speaker, strings.TrimSpace(m.RenderedText))
 			} else {
@@ -1054,12 +1062,13 @@ func (p *Pipeline) recordBotReplyTimeline(ctx context.Context, rc *RunContext) {
 	blocksJSON, _ := json.Marshal(blocks)
 	rendered := RenderBlocksText(blocks)
 
+	botName := p.resolveBotName()
 	_, err := p.store.AppendTimelineMessage(ctx, store.TimelineMessage{
 		ChannelID:    rc.ChannelID,
 		RoomID:       rc.RoomID,
 		MsgID:        msgID,
 		SenderID:     p.botUserID,
-		SenderName:   p.botName,
+		SenderName:   botName,
 		IsBot:        true,
 		TimestampMs:  nowMs,
 		ContentJSON:  string(blocksJSON),
@@ -1075,7 +1084,7 @@ func (p *Pipeline) recordBotReplyTimeline(ctx context.Context, rc *RunContext) {
 		RoomID:       rc.RoomID,
 		MsgID:        msgID,
 		SenderID:     p.botUserID,
-		SenderName:   p.botName,
+		SenderName:   botName,
 		IsBot:        true,
 		TimestampMs:  nowMs,
 		Blocks:       blocks,
@@ -1441,17 +1450,29 @@ func draftToolDefs(spec *RunSpec) []ai.ToolDef {
 	return spec.ToolDefs
 }
 
-func (p *Pipeline) inFreeReplyCooldown(recent []store.TimelineMessage, now time.Time) bool {
-	if p.freeReplyCooldown <= 0 {
-		return false
-	}
-	for i := len(recent) - 1; i >= 0; i-- {
-		if recent[i].IsBot && recent[i].TimestampMs > 0 {
-			elapsed := now.Sub(time.UnixMilli(recent[i].TimestampMs))
-			return elapsed >= 0 && elapsed < p.freeReplyCooldown
+func (p *Pipeline) resolveBotName() string {
+	if p.behaviorConfig != nil {
+		if name := strings.TrimSpace(p.behaviorConfig().BotName); name != "" {
+			return name
 		}
 	}
-	return false
+	return p.botName
+}
+
+func (p *Pipeline) resolveGateThresholds() (float64, float64) {
+	if p.behaviorConfig != nil {
+		beh := p.behaviorConfig()
+		th := beh.GateThreshold
+		at := beh.GateAtThreshold
+		if th <= 0 {
+			th = p.gateThreshold
+		}
+		if at <= 0 {
+			at = p.gateAtThreshold
+		}
+		return th, at
+	}
+	return p.gateThreshold, p.gateAtThreshold
 }
 
 func randomHex(nBytes int) string {

@@ -307,12 +307,16 @@ func (e *EmotionEngine) BuildGateDecisionRequest(
 	if err != nil {
 		return ai.DecisionRequest{}, pad.State{}, err
 	}
+	beh := store.DefaultBehaviorConfig()
+	if _, err := e.store.GetConfigJSON(ctx, store.ConfigKeyBehavior, &beh); err != nil {
+		e.logger.DebugContext(ctx, "load behavior config for gate decision failed; using defaults", slog.String("err", err.Error()))
+	}
 	status, err := e.CurrentFeeling(ctx, roomID, now)
 	if err != nil {
 		return ai.DecisionRequest{}, pad.State{}, err
 	}
 
-	input := formatGateDecisionInput(beliefs, status.InnerFeeling, cleanLines(earlierMessages), latest, isAtBot)
+	input := formatGateDecisionInput(beliefs, beh.BotAliases, status.InnerFeeling, cleanLines(earlierMessages), latest, isAtBot)
 	req := ai.DecisionRequest{
 		Input:     input,
 		Questions: buildGateDecisionQuestions(),
@@ -431,11 +435,17 @@ func buildPADStatus(roomID string, st pad.State, temp pad.Temperament) PADStatus
 	return status
 }
 
-func formatGateDecisionInput(beliefs, innerFeeling string, earlier, latest []string, isAtBot bool) string {
+func formatGateDecisionInput(beliefs, botAliases, innerFeeling string, earlier, latest []string, isAtBot bool) string {
 	var b strings.Builder
 	b.WriteString("<persona_self>\n")
 	b.WriteString(strings.TrimSpace(beliefs))
 	b.WriteString("\n</persona_self>\n")
+
+	if aliases := strings.TrimSpace(botAliases); aliases != "" {
+		b.WriteString("\n<bot_aliases>\n")
+		b.WriteString(aliases)
+		b.WriteString("\n</bot_aliases>\n")
+	}
 
 	if feeling := strings.TrimSpace(innerFeeling); feeling != "" {
 		b.WriteString("\n<inner_feeling>\n")
@@ -462,10 +472,20 @@ func formatGateDecisionInput(beliefs, innerFeeling string, earlier, latest []str
 func buildGateDecisionQuestions() map[string]ai.DecisionQuestion {
 	return map[string]ai.DecisionQuestion{
 		DecisionKeyShouldReply: {
-			Kind:             ai.DecisionNoul,
-			Instructions:     "结合 <persona_self>、<inner_feeling>（若有）、<earlier_context>、<latest_message> 与 <mention_signal>（若有），判断我此刻是否适合自然接话发言。熟人群聊默认多看少说：仅在被 @、被直接点名提问、大家热聊有明显可接的梗或分享喜讯/吃瓜时倾向发言；如果最新消息只是单个表情包/动画表情、简短附和或无意义水字、我在 <earlier_context> 里刚刚才回过话不想刷屏、或者是不熟的私事/吵架/道晚安散场，必须保持安静不插嘴。",
-			TrueDescription:  "确实值得自然接话或回应",
-			FalseDescription: "保持安静不插嘴（默认偏好）",
+			Kind: ai.DecisionNoul,
+			Instructions: "结合 <persona_self>、<inner_feeling>（若有）、<earlier_context>（其中包含我已看过或已发出的历史回复）、<latest_message>（刚刚收到的未处理新消息）与 <mention_signal>（若有），判断此时我是否应该开口接话：\n" +
+				"【应该接话的情况】：\n" +
+				"1. 新消息明确 @ 了我、引用回复了我的话、叫了 <bot_aliases> 里我的名字/外号或戳了我——只要对方不是让我闭嘴/别吵，且我在 <earlier_context> 里尚未回答过这条提问或请求，都必须回应；\n" +
+				"2. 我刚刚在 <earlier_context> 里正和对方聊在兴头上，新消息是顺着我的话继续追问或往下接；\n" +
+				"3. 群友抛出了全群开放话题、好笑的梗、倒霉事、八卦转发或求助，作为熟人群友顺嘴吐槽或接茬很自然。\n" +
+				"【不应该接话的情况】：\n" +
+				"1. 我在 <earlier_context> 里刚刚已经针对同一件事回复过了，新消息只是群友之间的顺延确认或刷屏，并未向我追问或开启新点（严防连续刷屏与重复接话）；\n" +
+				"2. 在没有 @ 我 的情况下，其他群友正在点对点对话或讨论与我无关的私事；\n" +
+				"3. 新消息只是对话收尾词（如“哦哦”“好”“哈哈”“ok”）或单个终结表情包/动画表情，正常人看到这里会自然结束本轮不再没话找话；\n" +
+				"4. 群友明确让我安静/闭嘴/别吵。\n" +
+				"综合以上情境，我现在是否应该对 <latest_message> 做出回应？",
+			TrueDescription:  "确实应该自然开口接话或回应",
+			FalseDescription: "保持安静看着不插嘴",
 		},
 		DecisionKeyDeltaP: {
 			Kind:         ai.DecisionScore,

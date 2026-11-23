@@ -16,6 +16,7 @@ const (
 	ConfigKeySlots     = "slots"
 	ConfigKeyMCP       = "mcp_servers"
 	ConfigKeyFeatures  = "features"
+	ConfigKeyBehavior  = "behavior"
 )
 
 // ProviderConfig defines a named AI provider endpoint referencing a write-only secret key.
@@ -81,6 +82,26 @@ type FeatureFlags struct {
 	BashToolsEnabled   bool `json:"bash_tools_enabled"`
 }
 
+// BehaviorConfig holds hot-reloadable group chat identity, gate threshold, and debounce settings.
+type BehaviorConfig struct {
+	BotName         string  `json:"bot_name"`
+	BotAliases      string  `json:"bot_aliases"`
+	GateThreshold   float64 `json:"gate_threshold"`
+	GateAtThreshold float64 `json:"gate_at_threshold"`
+	DebounceMs      int     `json:"debounce_ms"`
+}
+
+// DefaultBehaviorConfig returns the production-calibrated group chat behavior defaults.
+func DefaultBehaviorConfig() BehaviorConfig {
+	return BehaviorConfig{
+		BotName:         "bk101",
+		BotAliases:      "bk101|101",
+		GateThreshold:   0.70,
+		GateAtThreshold: 0.30,
+		DebounceMs:      1400,
+	}
+}
+
 // RuntimeConfig aggregates typed dynamic configuration stored in dynamic_config.
 type RuntimeConfig struct {
 	Providers  []ProviderConfig  `json:"providers"`
@@ -88,6 +109,7 @@ type RuntimeConfig struct {
 	Slots      SlotBindings      `json:"slots"`
 	MCPServers []MCPServerConfig `json:"mcp_servers"`
 	Features   FeatureFlags      `json:"features"`
+	Behavior   BehaviorConfig    `json:"behavior"`
 }
 
 // RuntimeConfigView combines RuntimeConfig with strictly redacted SecretStatus entries for API/UI layers.
@@ -183,6 +205,7 @@ func (s *Store) LoadRuntimeConfig(ctx context.Context) (RuntimeConfig, error) {
 		Models:     []ModelConfig{},
 		MCPServers: []MCPServerConfig{},
 		Features:   DefaultFeatureFlags(),
+		Behavior:   DefaultBehaviorConfig(),
 	}
 	if _, err := s.GetConfigJSON(ctx, ConfigKeyProviders, &cfg.Providers); err != nil {
 		return RuntimeConfig{}, err
@@ -199,6 +222,22 @@ func (s *Store) LoadRuntimeConfig(ctx context.Context) (RuntimeConfig, error) {
 	if _, err := s.GetConfigJSON(ctx, ConfigKeyFeatures, &cfg.Features); err != nil {
 		return RuntimeConfig{}, err
 	}
+	if _, err := s.GetConfigJSON(ctx, ConfigKeyBehavior, &cfg.Behavior); err != nil {
+		return RuntimeConfig{}, err
+	}
+	defBeh := DefaultBehaviorConfig()
+	if strings.TrimSpace(cfg.Behavior.BotName) == "" {
+		cfg.Behavior.BotName = defBeh.BotName
+	}
+	if cfg.Behavior.GateThreshold <= 0 {
+		cfg.Behavior.GateThreshold = defBeh.GateThreshold
+	}
+	if cfg.Behavior.GateAtThreshold <= 0 {
+		cfg.Behavior.GateAtThreshold = defBeh.GateAtThreshold
+	}
+	if cfg.Behavior.DebounceMs < 0 {
+		cfg.Behavior.DebounceMs = defBeh.DebounceMs
+	}
 	return cfg, nil
 }
 
@@ -214,6 +253,7 @@ func (s *Store) SaveRuntimeConfig(ctx context.Context, cfg RuntimeConfig) error 
 		{ConfigKeySlots, cfg.Slots},
 		{ConfigKeyMCP, cfg.MCPServers},
 		{ConfigKeyFeatures, cfg.Features},
+		{ConfigKeyBehavior, cfg.Behavior},
 	}
 
 	tx, err := s.writeDB.BeginTx(ctx, nil)

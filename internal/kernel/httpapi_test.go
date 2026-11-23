@@ -337,7 +337,15 @@ func TestHTTPAPI_FullContractAndSecretRedaction(t *testing.T) {
 			"memory_enabled":       true,
 			"emotion_enabled":      true,
 			"meme_collect_enabled": true,
+			"voice_enabled":        true,
 			"bash_enabled":         true,
+		},
+		"behavior": map[string]any{
+			"bot_name":          "bk101",
+			"bot_aliases":       "bk101|101|小101",
+			"gate_threshold":    0.72,
+			"gate_at_threshold": 0.28,
+			"debounce_ms":       1200,
 		},
 	}, http.StatusOK)
 
@@ -354,8 +362,14 @@ func TestHTTPAPI_FullContractAndSecretRedaction(t *testing.T) {
 	if len(cfgView.Providers) != 1 || cfgView.Providers[0].SecretKey != "custom-gemini-key" || !cfgView.Providers[0].HasAPIKey || !strings.HasPrefix(cfgView.Providers[0].APIKeyHint, "***") {
 		t.Fatalf("expected redacted provider key metadata with custom secret_key, got %+v", cfgView.Providers)
 	}
-	if !cfgView.Features.BashEnabled {
-		t.Fatalf("expected bash_enabled=true after config patch, got %+v", cfgView.Features)
+	if !cfgView.Features.BashEnabled || !cfgView.Features.VoiceEnabled {
+		t.Fatalf("expected bash_enabled=true and voice_enabled=true after config patch, got %+v", cfgView.Features)
+	}
+	if cfgView.Behavior.BotName != "bk101" || cfgView.Behavior.BotAliases != "bk101|101|小101" || cfgView.Behavior.GateThreshold != 0.72 || cfgView.Behavior.GateAtThreshold != 0.28 || cfgView.Behavior.DebounceMs != 1200 {
+		t.Fatalf("unexpected behavior config after patch: %+v", cfgView.Behavior)
+	}
+	if got := rt.BehaviorConfig(); got.GateThreshold != 0.72 || got.DebounceMs != 1200 {
+		t.Fatalf("expected hot-reloaded runtime behavior config, got %+v", got)
 	}
 
 	// Verify hot-reload atomically updated both AI registry and Bash sandbox toggle!

@@ -37,22 +37,21 @@ const (
 
 // RuntimeOptions configures a complete Bot Kernel Runtime.
 type RuntimeOptions struct {
-	DataDir           string
-	Store             *store.Store
-	Blobs             *store.BlobStore
-	SandboxDir        string
-	BotName           string
-	BotUserID         string
-	GateThreshold     float64
-	GateAtThreshold   float64
-	FreeReplyCooldown time.Duration
-	DebounceWindow    time.Duration
-	MaxSteps          int
-	Location          *time.Location
-	Clock             func() time.Time
-	Logger            *slog.Logger
-	InitialAI         *ai.Registry
-	DisableAsyncBg    bool
+	DataDir         string
+	Store           *store.Store
+	Blobs           *store.BlobStore
+	SandboxDir      string
+	BotName         string
+	BotUserID       string
+	GateThreshold   float64
+	GateAtThreshold float64
+	DebounceWindow  time.Duration
+	MaxSteps        int
+	Location        *time.Location
+	Clock           func() time.Time
+	Logger          *slog.Logger
+	InitialAI       *ai.Registry
+	DisableAsyncBg  bool
 }
 
 // Runtime bundles all Kernel subsystems, hot-reloadable AI/Tool/MCP state, Channel Hub, and HTTP API.
@@ -76,6 +75,7 @@ type Runtime struct {
 
 	aiReg        atomic.Pointer[ai.Registry]
 	features     atomic.Pointer[store.FeatureFlags]
+	behavior     atomic.Pointer[store.BehaviorConfig]
 	webSearchCfg atomic.Pointer[tools.WebSearchConfig]
 
 	// reloadMu serializes config hot-reload without blocking in-flight Runs reading atomic pointers.
@@ -162,6 +162,20 @@ func NewRuntime(ctx context.Context, opts RuntimeOptions) (*Runtime, error) {
 
 	defFlags := store.DefaultFeatureFlags()
 	rt.features.Store(&defFlags)
+	defBeh := store.DefaultBehaviorConfig()
+	if strings.TrimSpace(opts.BotName) != "" {
+		defBeh.BotName = strings.TrimSpace(opts.BotName)
+	}
+	if opts.GateThreshold > 0 {
+		defBeh.GateThreshold = opts.GateThreshold
+	}
+	if opts.GateAtThreshold > 0 {
+		defBeh.GateAtThreshold = opts.GateAtThreshold
+	}
+	if opts.DebounceWindow > 0 {
+		defBeh.DebounceMs = int(opts.DebounceWindow.Milliseconds())
+	}
+	rt.behavior.Store(&defBeh)
 
 	if opts.InitialAI != nil {
 		rt.aiReg.Store(opts.InitialAI)
@@ -216,27 +230,27 @@ func NewRuntime(ctx context.Context, opts RuntimeOptions) (*Runtime, error) {
 	})
 
 	pipe, err := NewPipeline(PipelineConfig{
-		Store:             st,
-		Blobs:             blobs,
-		Hub:               rt.Hub,
-		AIGetter:          rt.AIRegistry,
-		Memory:            rt.Memory,
-		Emotion:           rt.Emotion,
-		Persona:           rt.Persona,
-		Memes:             rt.Memes,
-		ToolsProvider:     rt.BuildRunTools,
-		FeatureFlags:      rt.FeatureFlags,
-		BotName:           opts.BotName,
-		BotUserID:         opts.BotUserID,
-		GateThreshold:     opts.GateThreshold,
-		GateAtThreshold:   opts.GateAtThreshold,
-		FreeReplyCooldown: opts.FreeReplyCooldown,
-		DebounceWindow:    opts.DebounceWindow,
-		MaxSteps:          opts.MaxSteps,
-		Location:          loc,
-		Clock:             clock,
-		Logger:            logger,
-		DisableAsyncBg:    opts.DisableAsyncBg,
+		Store:           st,
+		Blobs:           blobs,
+		Hub:             rt.Hub,
+		AIGetter:        rt.AIRegistry,
+		Memory:          rt.Memory,
+		Emotion:         rt.Emotion,
+		Persona:         rt.Persona,
+		Memes:           rt.Memes,
+		ToolsProvider:   rt.BuildRunTools,
+		FeatureFlags:    rt.FeatureFlags,
+		BehaviorConfig:  rt.BehaviorConfig,
+		BotName:         opts.BotName,
+		BotUserID:       opts.BotUserID,
+		GateThreshold:   opts.GateThreshold,
+		GateAtThreshold: opts.GateAtThreshold,
+		DebounceWindow:  opts.DebounceWindow,
+		MaxSteps:        opts.MaxSteps,
+		Location:        loc,
+		Clock:           clock,
+		Logger:          logger,
+		DisableAsyncBg:  opts.DisableAsyncBg,
 	})
 	if err != nil {
 		rt.cleanupOnInitError()
@@ -311,9 +325,17 @@ func (rt *Runtime) FeatureFlags() store.FeatureFlags {
 	return store.DefaultFeatureFlags()
 }
 
+// BehaviorConfig returns the current hot-reloaded group chat behavior & gate threshold snapshot.
+func (rt *Runtime) BehaviorConfig() store.BehaviorConfig {
+	if p := rt.behavior.Load(); p != nil {
+		return *p
+	}
+	return store.DefaultBehaviorConfig()
+}
+
 // Reload loads dynamic config from SQLite and atomically rebuilds the AI Registry,
-// feature flags (including Bash sandbox toggle), web search config, and MCP connections
-// without interrupting any in-flight Runs.
+// feature flags (including Bash sandbox toggle), behavior thresholds/debounce, web search config,
+// and MCP connections without interrupting any in-flight Runs.
 func (rt *Runtime) Reload(ctx context.Context) error {
 	rt.reloadMu.Lock()
 	defer rt.reloadMu.Unlock()
@@ -325,6 +347,11 @@ func (rt *Runtime) Reload(ctx context.Context) error {
 
 	flags := cfg.Features
 	rt.features.Store(&flags)
+	beh := cfg.Behavior
+	rt.behavior.Store(&beh)
+	if rt.Pipeline != nil && rt.Pipeline.Bus() != nil {
+		rt.Pipeline.Bus().SetDebounceWindow(time.Duration(beh.DebounceMs) * time.Millisecond)
+	}
 
 	newReg, searchCfg, regErr := rt.buildAIRegistry(ctx, cfg)
 	rt.aiReg.Store(newReg)

@@ -64,11 +64,6 @@ func runServe(
 	sandboxDir := fs.String("sandbox", "", "Optional isolated directory for default-off Bash/file tools")
 	envFile := fs.String("env", "", "Optional .env.local path to load non-destructively")
 	logLevel := fs.String("log-level", "info", "Log level (debug, info, warn, error)")
-	botName := fs.String("bot-name", "bk101", "Bot display nickname in group timelines")
-	gateThreshold := fs.Float64("gate-threshold", 0.70, "Decision probability threshold for free group replies")
-	gateAtThreshold := fs.Float64("gate-at-threshold", 0.30, "Decision probability threshold when directly @mentioned")
-	freeReplyCooldown := fs.Duration("free-reply-cooldown", 15*time.Second, "Cooldown between unprompted non-@bot replies in a room")
-	debounce := fs.Duration("debounce", 1500*time.Millisecond, "Debounce window for coalescing rapid group messages")
 
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -91,14 +86,9 @@ func runServe(
 	slog.SetDefault(logger)
 
 	rt, err := kernel.NewRuntime(ctx, kernel.RuntimeOptions{
-		DataDir:           *dataDir,
-		SandboxDir:        *sandboxDir,
-		BotName:           *botName,
-		GateThreshold:     *gateThreshold,
-		GateAtThreshold:   *gateAtThreshold,
-		FreeReplyCooldown: *freeReplyCooldown,
-		DebounceWindow:    *debounce,
-		Logger:            logger,
+		DataDir:    *dataDir,
+		SandboxDir: *sandboxDir,
+		Logger:     logger,
 	})
 	if err != nil {
 		return err

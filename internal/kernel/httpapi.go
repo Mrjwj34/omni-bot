@@ -214,6 +214,7 @@ type APIFeaturesConfig struct {
 	MemoryEnabled      bool `json:"memory_enabled"`
 	EmotionEnabled     bool `json:"emotion_enabled"`
 	MemeCollectEnabled bool `json:"meme_collect_enabled"`
+	VoiceEnabled       bool `json:"voice_enabled"`
 	BashEnabled        bool `json:"bash_enabled"`
 }
 
@@ -222,6 +223,7 @@ type APIRuntimeConfig struct {
 	ModelSlots []APIModelSlotConfig `json:"model_slots"`
 	MCPServers []APIMCPServerConfig `json:"mcp_servers"`
 	Features   APIFeaturesConfig    `json:"features"`
+	Behavior   store.BehaviorConfig `json:"behavior"`
 }
 
 type APIProviderUpdateInput struct {
@@ -242,9 +244,17 @@ type APIRuntimeConfigPatch struct {
 		MemoryEnabled      *bool `json:"memory_enabled,omitempty"`
 		EmotionEnabled     *bool `json:"emotion_enabled,omitempty"`
 		MemeCollectEnabled *bool `json:"meme_collect_enabled,omitempty"`
+		VoiceEnabled       *bool `json:"voice_enabled,omitempty"`
 		BashEnabled        *bool `json:"bash_enabled,omitempty"`
 		BashToolsEnabled   *bool `json:"bash_tools_enabled,omitempty"`
 	} `json:"features,omitempty"`
+	Behavior *struct {
+		BotName         *string  `json:"bot_name,omitempty"`
+		BotAliases      *string  `json:"bot_aliases,omitempty"`
+		GateThreshold   *float64 `json:"gate_threshold,omitempty"`
+		GateAtThreshold *float64 `json:"gate_at_threshold,omitempty"`
+		DebounceMs      *int     `json:"debounce_ms,omitempty"`
+	} `json:"behavior,omitempty"`
 }
 
 type APITimelineMessage struct {
@@ -1355,10 +1365,31 @@ func (rt *Runtime) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		if patch.Features.MemeCollectEnabled != nil {
 			cfg.Features.MemeCollectEnabled = *patch.Features.MemeCollectEnabled
 		}
+		if patch.Features.VoiceEnabled != nil {
+			cfg.Features.VoiceEnabled = *patch.Features.VoiceEnabled
+		}
 		if patch.Features.BashEnabled != nil {
 			cfg.Features.BashToolsEnabled = *patch.Features.BashEnabled
 		} else if patch.Features.BashToolsEnabled != nil {
 			cfg.Features.BashToolsEnabled = *patch.Features.BashToolsEnabled
+		}
+	}
+
+	if patch.Behavior != nil {
+		if patch.Behavior.BotName != nil && strings.TrimSpace(*patch.Behavior.BotName) != "" {
+			cfg.Behavior.BotName = strings.TrimSpace(*patch.Behavior.BotName)
+		}
+		if patch.Behavior.BotAliases != nil {
+			cfg.Behavior.BotAliases = strings.TrimSpace(*patch.Behavior.BotAliases)
+		}
+		if patch.Behavior.GateThreshold != nil && *patch.Behavior.GateThreshold > 0 && *patch.Behavior.GateThreshold <= 1 {
+			cfg.Behavior.GateThreshold = *patch.Behavior.GateThreshold
+		}
+		if patch.Behavior.GateAtThreshold != nil && *patch.Behavior.GateAtThreshold > 0 && *patch.Behavior.GateAtThreshold <= 1 {
+			cfg.Behavior.GateAtThreshold = *patch.Behavior.GateAtThreshold
+		}
+		if patch.Behavior.DebounceMs != nil && *patch.Behavior.DebounceMs >= 0 && *patch.Behavior.DebounceMs <= 10000 {
+			cfg.Behavior.DebounceMs = *patch.Behavior.DebounceMs
 		}
 	}
 
@@ -1630,8 +1661,10 @@ func (rt *Runtime) buildAPIRuntimeConfig(ctx context.Context) (APIRuntimeConfig,
 			MemoryEnabled:      view.Config.Features.MemoryEnabled,
 			EmotionEnabled:     view.Config.Features.EmotionEnabled,
 			MemeCollectEnabled: view.Config.Features.MemeCollectEnabled,
+			VoiceEnabled:       view.Config.Features.VoiceEnabled,
 			BashEnabled:        view.Config.Features.BashToolsEnabled,
 		},
+		Behavior: view.Config.Behavior,
 	}, nil
 }
 
