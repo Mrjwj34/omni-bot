@@ -1,15 +1,10 @@
 <script lang="ts">
 	import { Spring } from 'svelte/motion';
 	import {
-		Activity,
 		ArrowUpRight,
-		Brain,
 		Clock,
 		MessageSquareText,
-		Radio,
-		RefreshCw,
-		SmilePlus,
-		Zap
+		RefreshCw
 	} from '@lucide/svelte';
 	import {
 		api,
@@ -300,10 +295,7 @@
 		<!-- PAD Mood Hero Card -->
 		<SurfaceCard variant="raised" padding="lg" class="flex flex-col gap-4 lg:col-span-6">
 			<div class="flex flex-wrap items-center justify-between gap-2">
-				<div class="flex items-center gap-2">
-					<Activity class="size-4 text-mint-600" />
-					<span class="text-sm font-semibold text-ink-primary">PAD 情绪场</span>
-				</div>
+				<span class="text-sm font-semibold text-ink-primary">PAD 情绪场</span>
 				<div class="flex items-center gap-1.5">
 					<Badge tone="neutral" size="sm" class="font-mono">|v| {padMagnitude.toFixed(2)}</Badge>
 					<Badge tone={realtime.moodTone} size="sm">{realtime.moodLabel}</Badge>
@@ -587,10 +579,7 @@
 		<div class="flex flex-col gap-4 lg:col-span-6">
 			<SurfaceCard variant="raised" padding="lg" class="flex flex-col justify-between gap-4">
 				<div class="flex flex-wrap items-center justify-between gap-2">
-					<div class="flex items-center gap-2">
-						<Zap class="size-4 text-sky-600" />
-						<span class="text-sm font-semibold text-ink-primary">Run 实时管线</span>
-					</div>
+					<span class="text-sm font-semibold text-ink-primary">Run 实时管线</span>
 					{#if realtime.activeRun}
 						<Badge tone={isRunActive ? 'sky' : 'mint'} size="sm" dot pulse={isRunActive}>
 							{realtime.activeRun.run_id}
@@ -606,7 +595,7 @@
 						{@const isDone = activeStageIndex > idx}
 						<div
 							class={cn(
-								'relative flex flex-col gap-2 rounded-[var(--radius-panel)] p-3.5 transition-all duration-200',
+								'relative flex flex-col gap-2 rounded-[var(--radius-panel)] px-3 py-3 transition-all duration-200',
 								isCurrent
 									? 'bg-tint-mint text-mint-700 shadow-[var(--shadow-xs)]'
 									: isDone
@@ -634,7 +623,7 @@
 									></span>
 								</span>
 							</div>
-							<div class="truncate text-xs font-semibold text-ink-primary">{stage.label}</div>
+							<div class="whitespace-nowrap text-[11px] font-semibold text-ink-primary">{stage.label}</div>
 						</div>
 					{/each}
 				</div>
@@ -669,10 +658,7 @@
 			<div class="grid flex-1 grid-cols-2 gap-3.5">
 				<a href="/chat" class="block focus-visible:outline-none">
 					<SurfaceCard variant="tint-peach" padding="md" interactive class="flex h-full flex-col justify-between">
-						<div class="flex items-center justify-between gap-2">
-							<span class="text-xs font-medium text-ink-secondary">时间线消息</span>
-							<MessageSquareText class="size-4 shrink-0 text-coral-500" />
-						</div>
+						<span class="text-xs font-medium text-ink-secondary">时间线消息</span>
 						<div class="mt-3 flex items-baseline justify-between gap-2">
 							<span class="font-mono text-2xl font-bold text-ink-primary">
 								{dashboard?.metrics.messages_total !== undefined
@@ -688,10 +674,7 @@
 
 				<a href="/memory" class="block focus-visible:outline-none">
 					<SurfaceCard variant="tint-lilac" padding="md" interactive class="flex h-full flex-col justify-between">
-						<div class="flex items-center justify-between gap-2">
-							<span class="text-xs font-medium text-ink-secondary">活跃记忆</span>
-							<Brain class="size-4 shrink-0 text-lilac-600" />
-						</div>
+						<span class="text-xs font-medium text-ink-secondary">活跃记忆</span>
 						<div class="mt-3 flex items-baseline justify-between gap-2">
 							<span class="font-mono text-2xl font-bold text-ink-primary">
 								{dashboard?.metrics.memories_total ?? '—'}
@@ -703,10 +686,7 @@
 
 				<a href="/memes" class="block focus-visible:outline-none">
 					<SurfaceCard variant="tint-amber" padding="md" interactive class="flex h-full flex-col justify-between">
-						<div class="flex items-center justify-between gap-2">
-							<span class="text-xs font-medium text-ink-secondary">表情金库</span>
-							<SmilePlus class="size-4 shrink-0 text-amber-600" />
-						</div>
+						<span class="text-xs font-medium text-ink-secondary">表情金库</span>
 						<div class="mt-3 flex items-baseline justify-between gap-2">
 							<span class="font-mono text-2xl font-bold text-ink-primary">
 								{dashboard?.metrics.memes_total ?? '—'}
@@ -718,10 +698,7 @@
 
 				<a href="/traces" class="block focus-visible:outline-none">
 					<SurfaceCard variant="tint-mint" padding="md" interactive class="flex h-full flex-col justify-between">
-						<div class="flex items-center justify-between gap-2">
-							<span class="text-xs font-medium text-ink-secondary">近期 Run</span>
-							<Activity class="size-4 shrink-0 text-mint-600" />
-						</div>
+						<span class="text-xs font-medium text-ink-secondary">近期 Run</span>
 						<div class="mt-3 flex items-baseline justify-between gap-2">
 							<span class="font-mono text-2xl font-bold text-ink-primary">
 								{dashboard?.metrics.runs_today ?? '—'}
@@ -826,10 +803,7 @@
 		<SurfaceCard variant="raised" padding="md" class="flex flex-col gap-4 lg:col-span-5">
 			<div>
 				<div class="mb-2.5 flex items-center justify-between gap-2">
-					<div class="flex items-center gap-2">
-						<Radio class="size-4 text-sky-600" />
-						<span class="text-sm font-semibold text-ink-primary">已连通道</span>
-					</div>
+					<span class="text-sm font-semibold text-ink-primary">已连通道</span>
 					<Badge tone={adapters.length > 0 ? 'mint' : 'neutral'} size="sm">
 						{adapters.length} 在线
 					</Badge>

@@ -38,12 +38,7 @@
 		<div
 			class="flex items-center justify-between gap-2 rounded-[var(--radius-card)] bg-surface-raised/90 px-3.5 py-2.5 shadow-[var(--shadow-card)] backdrop-blur-md"
 		>
-			<a href="/" class="flex min-w-0 items-center gap-2.5">
-				<svg viewBox="0 0 28 28" class="size-7 shrink-0" aria-hidden="true">
-					<rect x="2" y="2" width="24" height="24" rx="7" fill="#16231f" />
-					<circle cx="14" cy="14" r="6" fill="none" stroke="#34d399" stroke-width="2.2" />
-					<circle cx="14" cy="14" r="2" fill="#ffffff" />
-				</svg>
+			<a href="/" class="flex min-w-0 items-center">
 				<span class="truncate text-sm font-bold tracking-tight text-ink-primary">omni-bot</span>
 			</a>
 
@@ -72,14 +67,11 @@
 			)}
 		>
 			<div class="flex flex-col gap-5">
-				<div class={cn('flex items-center', collapsed ? 'justify-center' : 'justify-between px-1.5')}>
-					<a href="/" class="flex min-w-0 items-center gap-2.5">
-						<svg viewBox="0 0 28 28" class="size-8 shrink-0" aria-hidden="true">
-							<rect x="2" y="2" width="24" height="24" rx="7" fill="#16231f" />
-							<circle cx="14" cy="14" r="6" fill="none" stroke="#34d399" stroke-width="2.2" />
-							<circle cx="14" cy="14" r="2" fill="#ffffff" />
-						</svg>
-						{#if !collapsed}
+				<div class={cn('flex items-center', collapsed ? 'justify-center' : 'justify-between px-2')}>
+					<a href="/" class="flex min-w-0 items-center">
+						{#if collapsed}
+							<span class="font-mono text-sm font-bold tracking-tight text-ink-primary">ob</span>
+						{:else}
 							<div class="min-w-0">
 								<div class="truncate text-base font-bold tracking-tight text-ink-primary">omni-bot</div>
 								<div class="truncate text-[11px] font-medium text-ink-muted">Kernel Studio</div>
