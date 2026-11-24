@@ -624,10 +624,8 @@
 					<!-- Providers Column -->
 					<SurfaceCard variant="raised" padding="lg" class="space-y-4 lg:col-span-7">
 						<div class="flex flex-wrap items-center justify-between gap-2">
-							<div class="flex items-center gap-2.5">
-								<span class="flex size-8 items-center justify-center rounded-xl bg-tint-sky text-sky-600">
-									<Server class="size-4" />
-								</span>
+							<div class="flex items-center gap-2">
+								<Server class="size-4 text-sky-600" />
 								<h2 class="text-sm font-semibold text-ink-primary">AI 供应商</h2>
 							</div>
 							<Button variant="tonal" size="sm" onclick={() => addProviderPreset()}>
@@ -768,11 +766,9 @@
 					<!-- Write-Only Secrets Column -->
 					<SurfaceCard variant="raised" padding="lg" class="space-y-4 lg:col-span-5">
 						<div class="flex flex-wrap items-center justify-between gap-2">
-							<div class="flex items-center gap-2.5">
-								<span class="flex size-8 items-center justify-center rounded-xl bg-tint-lilac text-lilac-600">
-									<KeyRound class="size-4" />
-								</span>
-								<h2 class="text-sm font-semibold text-ink-primary">Write-Only 密钥库</h2>
+							<div class="flex items-center gap-2">
+								<KeyRound class="size-4 text-lilac-600" />
+								<h2 class="text-sm font-semibold text-ink-primary">密钥管理</h2>
 							</div>
 							<Badge tone="lilac" size="sm">只写脱敏</Badge>
 						</div>
@@ -881,10 +877,8 @@
 						{@const bound = Boolean(slot.provider_id && slot.model_id.trim())}
 						<SurfaceCard variant="raised" padding="md" interactive class="space-y-3.5">
 							<div class="flex flex-wrap items-center justify-between gap-2">
-								<div class="flex items-center gap-2.5">
-									<span class="flex size-8 items-center justify-center rounded-xl bg-tint-mint text-mint-600">
-										<Cpu class="size-4" />
-									</span>
+								<div class="flex items-center gap-2">
+									<Cpu class="size-4 text-mint-600" />
 									<div>
 										<div class="text-sm font-semibold text-ink-primary">{slot.label}</div>
 									</div>
@@ -945,10 +939,8 @@
 					<!-- Group Chat Behavior, Gate Thresholds & Debounce (SQLite hot-reload) -->
 					<SurfaceCard variant="raised" padding="lg" class="space-y-4">
 						<div class="flex flex-wrap items-center justify-between gap-2">
-							<div class="flex flex-wrap items-center gap-2.5">
-								<span class="flex size-8 items-center justify-center rounded-xl bg-tint-mint text-mint-600">
-									<SlidersHorizontal class="size-4" />
-								</span>
+							<div class="flex flex-wrap items-center gap-2">
+								<SlidersHorizontal class="size-4 text-mint-600" />
 								<h2 class="text-sm font-semibold text-ink-primary">群聊行为与门控</h2>
 								<Badge tone="mint" size="sm">SQLite 热生效</Badge>
 							</div>
@@ -1004,17 +996,8 @@
 						class="space-y-3.5"
 					>
 						<div class="flex flex-wrap items-center justify-between gap-4">
-							<div class="flex min-w-0 items-center gap-3.5">
-								<span
-									class={cn(
-										'flex size-11 shrink-0 items-center justify-center rounded-2xl transition-colors',
-										features.bash_enabled
-											? 'bg-amber-500 text-white shadow-[0_8px_18px_-6px_rgba(242,162,27,0.7)]'
-											: 'bg-tint-amber text-amber-600'
-									)}
-								>
-									<Terminal class="size-5" />
-								</span>
+							<div class="flex min-w-0 items-center gap-2.5">
+								<Terminal class={cn('size-5 shrink-0', features.bash_enabled ? 'text-amber-600' : 'text-ink-muted')} />
 								<div class="min-w-0">
 									<div class="flex flex-wrap items-center gap-2">
 										<h2 class="text-base font-bold tracking-tight text-ink-primary">
@@ -1064,10 +1047,8 @@
 					<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 						<SurfaceCard variant="raised" padding="md">
 							<div class="flex items-center justify-between gap-3">
-								<div class="flex items-center gap-2.5">
-									<span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-tint-lilac text-lilac-600">
-										<Brain class="size-4" />
-									</span>
+								<div class="flex items-center gap-2">
+									<Brain class="size-4 shrink-0 text-lilac-600" />
 									<span class="text-sm font-semibold text-ink-primary">联想记忆</span>
 								</div>
 								<Switch bind:checked={features.memory_enabled} tone="mint" label="切换联想记忆" />
@@ -1076,10 +1057,8 @@
 
 						<SurfaceCard variant="raised" padding="md">
 							<div class="flex items-center justify-between gap-3">
-								<div class="flex items-center gap-2.5">
-									<span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-tint-peach text-coral-600">
-										<HeartPulse class="size-4" />
-									</span>
+								<div class="flex items-center gap-2">
+									<HeartPulse class="size-4 shrink-0 text-coral-600" />
 									<span class="text-sm font-semibold text-ink-primary">动态情绪</span>
 								</div>
 								<Switch bind:checked={features.emotion_enabled} tone="coral" label="切换动态情绪" />
@@ -1088,10 +1067,8 @@
 
 						<SurfaceCard variant="raised" padding="md">
 							<div class="flex items-center justify-between gap-3">
-								<div class="flex items-center gap-2.5">
-									<span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-tint-amber text-amber-600">
-										<SmilePlus class="size-4" />
-									</span>
+								<div class="flex items-center gap-2">
+									<SmilePlus class="size-4 shrink-0 text-amber-600" />
 									<span class="text-sm font-semibold text-ink-primary">表情收录</span>
 								</div>
 								<Switch
@@ -1104,10 +1081,8 @@
 
 						<SurfaceCard variant="raised" padding="md">
 							<div class="flex items-center justify-between gap-3">
-								<div class="flex items-center gap-2.5">
-									<span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-tint-sky text-sky-600">
-										<AudioLines class="size-4" />
-									</span>
+								<div class="flex items-center gap-2">
+									<AudioLines class="size-4 shrink-0 text-sky-600" />
 									<span class="text-sm font-semibold text-ink-primary">语音回复</span>
 								</div>
 								<Switch bind:checked={features.voice_enabled} tone="mint" label="切换语音回复" />
@@ -1118,10 +1093,8 @@
 					<!-- MCP Servers Panel -->
 					<SurfaceCard variant="raised" padding="lg" class="space-y-4">
 						<div class="flex flex-wrap items-center justify-between gap-2">
-							<div class="flex flex-wrap items-center gap-2.5">
-								<span class="flex size-8 items-center justify-center rounded-xl bg-tint-sky text-sky-600">
-									<Plug class="size-4" />
-								</span>
+							<div class="flex flex-wrap items-center gap-2">
+								<Plug class="size-4 text-sky-600" />
 								<h2 class="text-sm font-semibold text-ink-primary">MCP 外部扩展</h2>
 								<Badge tone="neutral" size="sm">Sampling / Elicitation 已关闭</Badge>
 							</div>

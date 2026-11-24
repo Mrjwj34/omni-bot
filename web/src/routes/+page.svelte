@@ -9,7 +9,6 @@
 		Radio,
 		RefreshCw,
 		SmilePlus,
-		Sparkles,
 		Zap
 	} from '@lucide/svelte';
 	import {
@@ -199,6 +198,9 @@
 			if (data.pad) {
 				realtime.seedPAD(data.pad);
 			}
+			if (data.pad_history && data.pad_history.length > 0) {
+				realtime.seedPADHistory(data.pad_history);
+			}
 			if (data.adapters) {
 				realtime.seedAdapters(data.adapters);
 			}
@@ -299,9 +301,7 @@
 		<SurfaceCard variant="raised" padding="lg" class="flex flex-col gap-4 lg:col-span-6">
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<div class="flex items-center gap-2">
-					<span class="flex size-8 items-center justify-center rounded-xl bg-tint-mint text-mint-600">
-						<Sparkles class="size-4" />
-					</span>
+					<Activity class="size-4 text-mint-600" />
 					<span class="text-sm font-semibold text-ink-primary">PAD 情绪场</span>
 				</div>
 				<div class="flex items-center gap-1.5">
@@ -311,44 +311,46 @@
 			</div>
 
 			<div class="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
-				<!-- Interactive 2D/3D-projected PAD Mood Orb SVG -->
-				<div class="relative flex size-40 shrink-0 items-center justify-center">
-					<div
-						class="pointer-events-none absolute inset-3 rounded-full blur-2xl transition-all duration-300"
-						style:background={orbPalette.glow}
-						style:transform={`scale(${0.92 + Math.abs(padSpring.current.a) * 0.25})`}
-					></div>
+				<!-- Flat geometric PAD coordinate plane -->
+				<div class="relative flex size-40 shrink-0 items-center justify-center rounded-2xl bg-surface-subtle/70">
 					<svg
 						viewBox="0 0 180 180"
 						class="relative size-40 overflow-visible select-none"
 						role="img"
-						aria-label={`PAD 情绪球 P=${fmtSigned(padSpring.current.p)} A=${fmtSigned(padSpring.current.a)} D=${fmtSigned(padSpring.current.d)}`}
+						aria-label={`PAD 情绪坐标 P=${fmtSigned(padSpring.current.p)} A=${fmtSigned(padSpring.current.a)} D=${fmtSigned(padSpring.current.d)}`}
 					>
-						<defs>
-							<radialGradient id="padOrbGrad" cx="35%" cy="30%" r="70%">
-								<stop offset="0%" stop-color="#ffffff" stop-opacity="0.55" />
-								<stop offset="32%" stop-color={orbPalette.start} stop-opacity="1" />
-								<stop offset="100%" stop-color={orbPalette.end} stop-opacity="1" />
-							</radialGradient>
-							<radialGradient id="padHaloGrad" cx="50%" cy="50%" r="50%">
-								<stop offset="0%" stop-color={orbPalette.start} stop-opacity="0.22" />
-								<stop offset="100%" stop-color={orbPalette.end} stop-opacity="0" />
-							</radialGradient>
-						</defs>
-
-						<!-- Outer spherical reference ring -->
-						<circle cx="90" cy="90" r="68" fill="url(#padHaloGrad)" />
+						<!-- Concentric reference rings -->
 						<circle
 							cx="90"
 							cy="90"
-							r="68"
+							r="64"
 							fill="none"
 							stroke="#7f948d"
-							stroke-opacity="0.2"
-							stroke-width="1.2"
-							stroke-dasharray="3 4"
+							stroke-opacity="0.18"
+							stroke-width="1"
 						/>
-						<!-- 3D depth-projected equatorial ellipse -->
+						<circle
+							cx="90"
+							cy="90"
+							r="36"
+							fill="none"
+							stroke="#7f948d"
+							stroke-opacity="0.14"
+							stroke-width="1"
+						/>
+						<!-- Deadzone boundary (r = 0.18 * 64 ≈ 12px) -->
+						<circle
+							cx="90"
+							cy="90"
+							r="12"
+							fill="#7f948d"
+							fill-opacity="0.06"
+							stroke="#7f948d"
+							stroke-opacity="0.26"
+							stroke-width="1"
+							stroke-dasharray="2 2"
+						/>
+						<!-- D-axis depth ellipse -->
 						<ellipse
 							cx="90"
 							cy="90"
@@ -356,8 +358,8 @@
 							ry={orbGeom.ringRy}
 							fill="none"
 							stroke={hoveredAxis === 'd' ? '#9272ff' : '#7f948d'}
-							stroke-opacity={hoveredAxis === 'd' ? '0.6' : '0.22'}
-							stroke-width={hoveredAxis === 'd' ? '1.8' : '1.1'}
+							stroke-opacity={hoveredAxis === 'd' ? '0.6' : '0.18'}
+							stroke-width={hoveredAxis === 'd' ? '1.6' : '1'}
 						/>
 						<!-- P & A crosshairs -->
 						<line
@@ -367,7 +369,7 @@
 							y2="90"
 							stroke={hoveredAxis === 'p' ? '#18b888' : '#7f948d'}
 							stroke-opacity={hoveredAxis === 'p' ? '0.65' : '0.2'}
-							stroke-width={hoveredAxis === 'p' ? '1.8' : '1'}
+							stroke-width={hoveredAxis === 'p' ? '1.6' : '1'}
 						/>
 						<line
 							x1="90"
@@ -376,10 +378,10 @@
 							y2="156"
 							stroke={hoveredAxis === 'a' ? '#ff7354' : '#7f948d'}
 							stroke-opacity={hoveredAxis === 'a' ? '0.65' : '0.2'}
-							stroke-width={hoveredAxis === 'a' ? '1.8' : '1'}
+							stroke-width={hoveredAxis === 'a' ? '1.6' : '1'}
 						/>
 						<!-- Axis labels -->
-						<text x="163" y="93" font-size="9" font-weight="600" fill="#119870">P+</text>
+						<text x="162" y="93" font-size="9" font-weight="600" fill="#119870">P+</text>
 						<text x="8" y="93" font-size="9" font-weight="600" fill="#7f948d">P-</text>
 						<text x="84" y="16" font-size="9" font-weight="600" fill="#e85a3c">A+</text>
 						<text x="85" y="172" font-size="9" font-weight="600" fill="#7f948d">A-</text>
@@ -391,30 +393,24 @@
 							x2={orbGeom.cx}
 							y2={orbGeom.cy}
 							stroke={orbPalette.start}
-							stroke-opacity="0.55"
-							stroke-width="2"
+							stroke-opacity="0.7"
+							stroke-width="1.6"
 							stroke-linecap="round"
 						/>
-						<circle cx="90" cy="90" r="2.5" fill="#7f948d" fill-opacity="0.45" />
+						<circle cx="90" cy="90" r="2" fill="#7f948d" fill-opacity="0.5" />
 
-						<!-- Live PAD Mood Orb -->
-						<g class="transition-opacity duration-200">
-							<circle
-								cx={orbGeom.cx}
-								cy={orbGeom.cy}
-								r={orbGeom.radius + 5}
-								fill={orbPalette.start}
-								fill-opacity="0.18"
-							/>
-							<circle cx={orbGeom.cx} cy={orbGeom.cy} r={orbGeom.radius} fill="url(#padOrbGrad)" />
-							<circle
-								cx={orbGeom.cx - orbGeom.radius * 0.28}
-								cy={orbGeom.cy - orbGeom.radius * 0.28}
-								r={orbGeom.radius * 0.24}
-								fill="#ffffff"
-								fill-opacity="0.65"
-							/>
-						</g>
+						<!-- Crisp flat coordinate marker -->
+						<circle
+							cx={orbGeom.cx}
+							cy={orbGeom.cy}
+							r="10"
+							fill={orbPalette.start}
+							fill-opacity="0.14"
+							stroke={orbPalette.start}
+							stroke-opacity="0.55"
+							stroke-width="1.2"
+						/>
+						<circle cx={orbGeom.cx} cy={orbGeom.cy} r="4.5" fill={orbPalette.start} />
 					</svg>
 				</div>
 
@@ -454,10 +450,10 @@
 				</div>
 			</div>
 
-			<!-- 1st-person <inner_feeling> card -->
+			<!-- 1st-person inner feeling card -->
 			<div class={cn('rounded-[var(--radius-panel)] px-4 py-3 transition-colors duration-300', orbPalette.tint)}>
 				<div class="flex items-center justify-between gap-2">
-					<span class="font-mono text-[11px] font-semibold text-ink-muted">&lt;inner_feeling&gt;</span>
+					<span class="text-[11px] font-medium text-ink-muted">此刻心境</span>
 					{#if realtime.padState.updated_at}
 						<span class="font-mono text-[11px] text-ink-muted">
 							{formatTime(realtime.padState.updated_at)}
@@ -592,9 +588,7 @@
 			<SurfaceCard variant="raised" padding="lg" class="flex flex-col justify-between gap-4">
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					<div class="flex items-center gap-2">
-						<span class="flex size-8 items-center justify-center rounded-xl bg-tint-sky text-sky-600">
-							<Zap class="size-4" />
-						</span>
+						<Zap class="size-4 text-sky-600" />
 						<span class="text-sm font-semibold text-ink-primary">Run 实时管线</span>
 					</div>
 					{#if realtime.activeRun}

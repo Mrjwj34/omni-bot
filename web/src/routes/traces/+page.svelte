@@ -537,7 +537,7 @@
 
 										{#if activeDetail.inner_feeling}
 											<div class="rounded-[var(--radius-control)] bg-surface-raised px-3.5 py-2.5 text-xs text-ink-primary">
-												<span class="mr-2 font-mono text-[10px] font-semibold text-ink-muted">&lt;inner_feeling&gt;</span>
+												<span class="mr-2 text-[11px] font-medium text-ink-muted">此刻心境</span>
 												<span>“{activeDetail.inner_feeling}”</span>
 											</div>
 										{/if}

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
-	import { Menu, PanelLeftClose, PanelLeftOpen, Sparkles } from '@lucide/svelte';
+	import { Menu, PanelLeftClose, PanelLeftOpen } from '@lucide/svelte';
 	import { Badge, Button, Dialog, cn } from '$lib/components/ui';
 	import { realtime } from '$lib/stores/realtime.svelte';
 	import PADMiniPill from './PADMiniPill.svelte';
@@ -39,11 +39,11 @@
 			class="flex items-center justify-between gap-2 rounded-[var(--radius-card)] bg-surface-raised/90 px-3.5 py-2.5 shadow-[var(--shadow-card)] backdrop-blur-md"
 		>
 			<a href="/" class="flex min-w-0 items-center gap-2.5">
-				<span
-					class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-mint-400 to-mint-600 text-white shadow-xs"
-				>
-					<Sparkles class="size-4" />
-				</span>
+				<svg viewBox="0 0 28 28" class="size-7 shrink-0" aria-hidden="true">
+					<rect x="2" y="2" width="24" height="24" rx="7" fill="#16231f" />
+					<circle cx="14" cy="14" r="6" fill="none" stroke="#34d399" stroke-width="2.2" />
+					<circle cx="14" cy="14" r="2" fill="#ffffff" />
+				</svg>
 				<span class="truncate text-sm font-bold tracking-tight text-ink-primary">omni-bot</span>
 			</a>
 
@@ -74,12 +74,11 @@
 			<div class="flex flex-col gap-5">
 				<div class={cn('flex items-center', collapsed ? 'justify-center' : 'justify-between px-1.5')}>
 					<a href="/" class="flex min-w-0 items-center gap-2.5">
-						<span
-							class="relative flex size-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-mint-400 to-mint-600 text-white shadow-[0_6px_16px_-6px_rgba(24,184,136,0.6)]"
-						>
-							<Sparkles class="size-4" />
-							<span class="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-coral-400"></span>
-						</span>
+						<svg viewBox="0 0 28 28" class="size-8 shrink-0" aria-hidden="true">
+							<rect x="2" y="2" width="24" height="24" rx="7" fill="#16231f" />
+							<circle cx="14" cy="14" r="6" fill="none" stroke="#34d399" stroke-width="2.2" />
+							<circle cx="14" cy="14" r="2" fill="#ffffff" />
+						</svg>
 						{#if !collapsed}
 							<div class="min-w-0">
 								<div class="truncate text-base font-bold tracking-tight text-ink-primary">omni-bot</div>

@@ -633,9 +633,7 @@
 		<SurfaceCard variant="raised" padding="md" class="h-fit space-y-3 lg:col-span-4">
 			<div class="flex items-center justify-between gap-2">
 				<div class="flex items-center gap-2">
-					<span class="flex size-7 items-center justify-center rounded-xl bg-tint-mint text-mint-600">
-						<Tag class="size-3.5" />
-					</span>
+					<Tag class="size-4 text-mint-600" />
 					<span class="text-sm font-semibold text-ink-primary">实体与别名</span>
 				</div>
 				<Badge tone="neutral" size="sm">{aliasGroups.length}</Badge>

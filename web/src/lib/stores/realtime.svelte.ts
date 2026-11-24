@@ -155,6 +155,11 @@ class RealtimeStore {
 		this.padState = state;
 	}
 
+	seedPADHistory(points: PADHistoryPoint[]): void {
+		if (!Array.isArray(points) || points.length === 0) return;
+		this.padHistory = points.slice(-MAX_PAD_HISTORY);
+	}
+
 	seedAdapters(list: AdapterInfo[]): void {
 		this.adapters = list;
 	}

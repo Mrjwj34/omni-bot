@@ -533,10 +533,8 @@
 					<div class="flex flex-col gap-4 lg:col-span-7">
 						<SurfaceCard variant="raised" padding="lg" class="flex flex-1 flex-col gap-4">
 							<div class="flex flex-wrap items-center justify-between gap-2">
-								<div class="flex items-center gap-2.5">
-									<span class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-tint-lilac text-lilac-600">
-										<Lock class="size-4" />
-									</span>
+								<div class="flex items-center gap-2">
+									<Lock class="size-4 shrink-0 text-lilac-600" />
 									<h2 class="text-sm font-semibold text-ink-primary">《自我观念与信念》</h2>
 									<Badge tone="lilac" size="sm">冻结锚点</Badge>
 								</div>
@@ -605,10 +603,8 @@
 					<!-- Right: Temperament PAD Gauges with Hard-Envelope Drift Bar -->
 					<SurfaceCard variant="raised" padding="lg" class="flex flex-col gap-4 lg:col-span-5">
 						<div class="flex flex-wrap items-center justify-between gap-2">
-							<div class="flex items-center gap-2.5">
-								<span class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-tint-peach text-coral-600">
-									<SlidersHorizontal class="size-4" />
-								</span>
+							<div class="flex items-center gap-2">
+								<SlidersHorizontal class="size-4 shrink-0 text-coral-600" />
 								<h2 class="text-sm font-semibold text-ink-primary">气质动力学 PAD</h2>
 							</div>
 							<Badge tone="coral" size="sm">±{MAX_DRIFT.toFixed(2)} 硬包络</Badge>
@@ -1004,9 +1000,7 @@
 							{#if activeToSnapshot && activeFromSnapshot && snapshotDiff}
 								<div class="flex flex-wrap items-center justify-between gap-3">
 									<div class="flex flex-wrap items-center gap-2">
-										<span class="flex size-8 items-center justify-center rounded-xl bg-tint-sky text-sky-600">
-											<GitCompareArrows class="size-4" />
-										</span>
+										<GitCompareArrows class="size-4 text-sky-600" />
 										<Badge tone="neutral" size="sm">v{activeFromSnapshot.version}</Badge>
 										<ArrowRight class="size-3.5 text-ink-muted" />
 										<Badge tone="mint" size="sm">v{activeToSnapshot.version}</Badge>

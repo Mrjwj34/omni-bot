@@ -226,6 +226,7 @@ export interface DashboardResponse {
 	status: 'ok' | 'degraded';
 	uptime_sec: number;
 	pad: PADState;
+	pad_history?: Array<{ value: PADVec3; timestamp_ms: number }>;
 	adapters: AdapterInfo[];
 	metrics: DashboardMetrics;
 	recent_traces: RunTraceSummary[];
