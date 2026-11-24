@@ -28,7 +28,7 @@ import (
 const (
 	defaultChannelID       = "napcat"
 	defaultMaxForwardDepth = 3
-	defaultMaxMediaBytes   = 64 << 20
+	defaultMaxMediaBytes   = 128 << 20
 )
 
 var (

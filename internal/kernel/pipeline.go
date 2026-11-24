@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +35,10 @@ const (
 	defaultRecentTimelineLimit = 30
 	defaultDistillBatchSize    = 20
 	defaultMemeHandLimit       = 6
+	defaultMaxImagesPerTurn    = 16
+	defaultHistImageCap        = 8
+	defaultHistStickerCap      = 2
+	defaultHistMediaScanLimit  = 20
 )
 
 // Static neutral system protocol physically isolated from the 1st-person persona self-mind.
@@ -769,10 +774,11 @@ func (p *Pipeline) contributeTimeline(ctx context.Context, rc *RunContext, draft
 			if m.IsAtBot {
 				speaker += " [@我]"
 			}
+			lineText := renderTimelineMessageText(m)
 			if m.MsgID != "" {
-				fmt.Fprintf(&sb, "[%s] (id:%s) %s: %s\n", ts, m.MsgID, speaker, strings.TrimSpace(m.RenderedText))
+				fmt.Fprintf(&sb, "[%s] (id:%s) %s: %s\n", ts, m.MsgID, speaker, lineText)
 			} else {
-				fmt.Fprintf(&sb, "[%s] %s: %s\n", ts, speaker, strings.TrimSpace(m.RenderedText))
+				fmt.Fprintf(&sb, "[%s] %s: %s\n", ts, speaker, lineText)
 			}
 		}
 		sb.WriteString("</recent_timeline>")
@@ -790,39 +796,9 @@ func (p *Pipeline) contributeTimeline(ctx context.Context, rc *RunContext, draft
 		draft.AddDynamic("<mention_signal>\n最新消息中有人直接 @ 提到了我。\n</mention_signal>")
 	}
 
-	// Attach multimodal media parts from pending messages for native or MediaFallback consumption.
-	for _, m := range rc.PendingMessages {
-		if m.ContentJSON == "" || m.ContentJSON == "[]" {
-			continue
-		}
-		var blocks []protocol.ContentBlock
-		if err := json.Unmarshal([]byte(m.ContentJSON), &blocks); err != nil {
-			continue
-		}
-		for _, blk := range blocks {
-			if blk.Media == nil || blk.Media.BlobID == "" {
-				continue
-			}
-			var kind ai.PartKind
-			switch blk.Type {
-			case protocol.BlockImage:
-				kind = ai.PartImage
-			case protocol.BlockAudio:
-				kind = ai.PartAudio
-			case protocol.BlockVideo:
-				kind = ai.PartVideo
-			default:
-				continue
-			}
-			draft.MediaParts = append(draft.MediaParts, ai.MediaPart(kind, ai.MediaRef{
-				BlobID:     blk.Media.BlobID,
-				MIMEType:   blk.Media.MIMEType,
-				SizeBytes:  blk.Media.SizeBytes,
-				DurationMs: blk.Media.DurationMs,
-				Caption:    blk.Description,
-			}))
-		}
-	}
+	// Mount multimodal media across both pending and recent processed turns so earlier images/videos
+	// referenced in follow-up messages are never dropped.
+	draft.MediaParts = append(draft.MediaParts, p.collectTimelineMediaParts(recent, rc.PendingMessages)...)
 	return nil
 }
 
@@ -1355,10 +1331,342 @@ func RenderBlocksText(blocks []protocol.ContentBlock) string {
 				parts = append(parts, "[回复:"+b.ReplyToMsgID+"]")
 			}
 		case protocol.BlockForwardTree:
-			parts = append(parts, fmt.Sprintf("[合并转发:%d条]", len(b.ForwardNodes)))
+			if rendered := renderForwardTreeText(b.ForwardNodes, 0); rendered != "" {
+				parts = append(parts, rendered)
+			} else {
+				parts = append(parts, fmt.Sprintf("[合并转发:%d条]", len(b.ForwardNodes)))
+			}
 		}
 	}
 	return strings.TrimSpace(strings.Join(parts, " "))
+}
+
+type mountedMedia struct {
+	kind        ai.PartKind
+	ref         ai.MediaRef
+	isSticker   bool
+	msgID       string
+	sender      string
+	timestampMs int64
+	order       int
+}
+
+func (p *Pipeline) collectTimelineMediaParts(recent, pending []store.TimelineMessage) []ai.Part {
+	botName := p.resolveBotName()
+
+	pendingSet := make(map[int64]bool, len(pending))
+	replyTargets := make(map[string]bool)
+	for _, m := range pending {
+		if m.SeqID > 0 {
+			pendingSet[m.SeqID] = true
+		}
+		for _, refID := range extractReplyRefIDs(m.ContentJSON) {
+			replyTargets[refID] = true
+		}
+	}
+
+	// Build unified chronological message list (recent already contains pending when loaded from DB;
+	// append any pending messages not present in recent for unit-test/synthetic runs).
+	allMsgs := make([]store.TimelineMessage, 0, len(recent)+len(pending))
+	seenSeq := make(map[int64]bool, len(recent))
+	for _, m := range recent {
+		allMsgs = append(allMsgs, m)
+		if m.SeqID > 0 {
+			seenSeq[m.SeqID] = true
+		}
+	}
+	for _, m := range pending {
+		if m.SeqID > 0 && seenSeq[m.SeqID] {
+			continue
+		}
+		allMsgs = append(allMsgs, m)
+	}
+
+	seenBlobs := make(map[string]bool)
+	var (
+		selectedImages []mountedMedia
+		selectedVideos []mountedMedia
+		selectedAudios []mountedMedia
+	)
+
+	addMedia := func(item mountedMedia) bool {
+		if item.ref.BlobID == "" || seenBlobs[item.ref.BlobID] {
+			return false
+		}
+		seenBlobs[item.ref.BlobID] = true
+		switch item.kind {
+		case ai.PartImage:
+			selectedImages = append(selectedImages, item)
+		case ai.PartVideo:
+			selectedVideos = append(selectedVideos, item)
+		case ai.PartAudio:
+			selectedAudios = append(selectedAudios, item)
+		}
+		return true
+	}
+
+	isPendingMsg := func(m store.TimelineMessage) bool {
+		if m.SeqID > 0 && pendingSet[m.SeqID] {
+			return true
+		}
+		for _, pm := range pending {
+			if pm.SeqID == 0 && pm.MsgID != "" && pm.MsgID == m.MsgID {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Pass 1: all unique media in current pending messages (latest 16 images if burst).
+	var pendingImgs []mountedMedia
+	for idx, m := range allMsgs {
+		if !isPendingMsg(m) {
+			continue
+		}
+		for _, item := range extractMessageMedia(m, formatSpeakerLabel(m, botName), idx) {
+			if item.kind == ai.PartImage {
+				pendingImgs = append(pendingImgs, item)
+			} else {
+				addMedia(item)
+			}
+		}
+	}
+	if len(pendingImgs) > defaultMaxImagesPerTurn {
+		pendingImgs = pendingImgs[len(pendingImgs)-defaultMaxImagesPerTurn:]
+	}
+	for _, item := range pendingImgs {
+		addMedia(item)
+	}
+
+	// Pass 2: media from explicitly reply-referenced messages in recent timeline.
+	if len(replyTargets) > 0 {
+		for idx, m := range allMsgs {
+			if m.MsgID == "" || !replyTargets[m.MsgID] || isPendingMsg(m) {
+				continue
+			}
+			for _, item := range extractMessageMedia(m, formatSpeakerLabel(m, botName), idx) {
+				if item.kind == ai.PartImage && len(selectedImages) >= defaultMaxImagesPerTurn {
+					continue
+				}
+				addMedia(item)
+			}
+		}
+	}
+
+	// Pass 3: historical images/videos/audios from recent processed turns (newest-first,
+	// prioritizing real photos over repeated stickers so earlier turns' photos are never dropped).
+	histImgCap := min(defaultHistImageCap, defaultMaxImagesPerTurn-len(selectedImages))
+	histPhotosAdded := 0
+	histStickersAdded := 0
+	var histStickerCandidates []mountedMedia
+
+	startIdx := max(0, len(allMsgs)-defaultHistMediaScanLimit)
+	for idx := len(allMsgs) - 1; idx >= startIdx; idx-- {
+		m := allMsgs[idx]
+		if m.IsBot || isPendingMsg(m) {
+			continue
+		}
+		items := extractMessageMedia(m, formatSpeakerLabel(m, botName), idx)
+		for i := len(items) - 1; i >= 0; i-- {
+			item := items[i]
+			switch item.kind {
+			case ai.PartImage:
+				if item.isSticker {
+					histStickerCandidates = append(histStickerCandidates, item)
+					continue
+				}
+				if histPhotosAdded < histImgCap && len(selectedImages) < defaultMaxImagesPerTurn {
+					if addMedia(item) {
+						histPhotosAdded++
+					}
+				}
+			case ai.PartVideo:
+				if len(selectedVideos) == 0 {
+					addMedia(item)
+				}
+			case ai.PartAudio:
+				if len(selectedAudios) == 0 {
+					addMedia(item)
+				}
+			}
+		}
+	}
+	for _, item := range histStickerCandidates {
+		if histStickersAdded >= defaultHistStickerCap || histPhotosAdded+histStickersAdded >= histImgCap || len(selectedImages) >= defaultMaxImagesPerTurn {
+			break
+		}
+		if addMedia(item) {
+			histStickersAdded++
+		}
+	}
+
+	combined := make([]mountedMedia, 0, len(selectedImages)+len(selectedVideos)+len(selectedAudios))
+	combined = append(combined, selectedImages...)
+	combined = append(combined, selectedVideos...)
+	combined = append(combined, selectedAudios...)
+	if len(combined) == 0 {
+		return nil
+	}
+
+	slices.SortStableFunc(combined, func(a, b mountedMedia) int {
+		if a.order != b.order {
+			if a.order < b.order {
+				return -1
+			}
+			return 1
+		}
+		return 0
+	})
+
+	parts := make([]ai.Part, 0, len(combined)*2)
+	for _, item := range combined {
+		ts := time.UnixMilli(item.timestampMs).In(p.location).Format("15:04")
+		label := fmt.Sprintf("[媒体附件 · %s %s", ts, item.sender)
+		if item.msgID != "" {
+			label += fmt.Sprintf(" (id:%s)", item.msgID)
+		}
+		label += "]"
+		parts = append(parts, ai.TextPart(label), ai.MediaPart(item.kind, item.ref))
+	}
+	return parts
+}
+
+func extractMessageMedia(m store.TimelineMessage, sender string, order int) []mountedMedia {
+	if m.ContentJSON == "" || m.ContentJSON == "[]" {
+		return nil
+	}
+	var blocks []protocol.ContentBlock
+	if err := json.Unmarshal([]byte(m.ContentJSON), &blocks); err != nil {
+		return nil
+	}
+	var out []mountedMedia
+	collectMediaFromBlocks(blocks, m.MsgID, sender, m.TimestampMs, order, &out)
+	return out
+}
+
+func collectMediaFromBlocks(blocks []protocol.ContentBlock, msgID, sender string, tsMs int64, order int, out *[]mountedMedia) {
+	for _, blk := range blocks {
+		if blk.Type == protocol.BlockForwardTree {
+			for _, node := range blk.ForwardNodes {
+				nodeSender := strings.TrimSpace(node.SenderName)
+				if nodeSender == "" {
+					nodeSender = sender
+				}
+				nodeTS := node.TimestampMs
+				if nodeTS == 0 {
+					nodeTS = tsMs
+				}
+				collectMediaFromBlocks(node.Blocks, msgID, nodeSender, nodeTS, order, out)
+			}
+			continue
+		}
+		if blk.Media == nil || blk.Media.BlobID == "" {
+			continue
+		}
+		var kind ai.PartKind
+		switch blk.Type {
+		case protocol.BlockImage:
+			kind = ai.PartImage
+		case protocol.BlockAudio:
+			kind = ai.PartAudio
+		case protocol.BlockVideo:
+			kind = ai.PartVideo
+		default:
+			continue
+		}
+		*out = append(*out, mountedMedia{
+			kind: kind,
+			ref: ai.MediaRef{
+				BlobID:     blk.Media.BlobID,
+				MIMEType:   blk.Media.MIMEType,
+				SizeBytes:  blk.Media.SizeBytes,
+				DurationMs: blk.Media.DurationMs,
+				Caption:    blk.Description,
+			},
+			isSticker:   isStickerBlock(blk),
+			msgID:       msgID,
+			sender:      sender,
+			timestampMs: tsMs,
+			order:       order,
+		})
+	}
+}
+
+func isStickerBlock(blk protocol.ContentBlock) bool {
+	if blk.Type != protocol.BlockImage {
+		return false
+	}
+	if strings.Contains(blk.Description, "动画表情") || strings.Contains(blk.Description, "表情包") {
+		return true
+	}
+	if blk.Media != nil && blk.Media.Meta != nil {
+		for _, k := range []string{"sub_type", "subType"} {
+			if v, ok := blk.Media.Meta[k]; ok && fmt.Sprint(v) == "1" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func extractReplyRefIDs(contentJSON string) []string {
+	if contentJSON == "" || contentJSON == "[]" {
+		return nil
+	}
+	var blocks []protocol.ContentBlock
+	if err := json.Unmarshal([]byte(contentJSON), &blocks); err != nil {
+		return nil
+	}
+	var ids []string
+	for _, blk := range blocks {
+		if blk.Type == protocol.BlockReplyRef && blk.ReplyToMsgID != "" {
+			ids = append(ids, blk.ReplyToMsgID)
+		}
+	}
+	return ids
+}
+
+func renderTimelineMessageText(m store.TimelineMessage) string {
+	txt := strings.TrimSpace(m.RenderedText)
+	if strings.HasPrefix(txt, "[合并转发:") && m.ContentJSON != "" && m.ContentJSON != "[]" {
+		var blocks []protocol.ContentBlock
+		if err := json.Unmarshal([]byte(m.ContentJSON), &blocks); err == nil {
+			if expanded := RenderBlocksText(blocks); expanded != "" {
+				return expanded
+			}
+		}
+	}
+	return txt
+}
+
+func renderForwardTreeText(nodes []protocol.ForwardNode, depth int) string {
+	if len(nodes) == 0 || depth > 2 {
+		return ""
+	}
+	var lines []string
+	for _, node := range nodes {
+		if len(lines) >= 12 {
+			lines = append(lines, fmt.Sprintf("...（共%d条）", len(nodes)))
+			break
+		}
+		who := strings.TrimSpace(node.SenderName)
+		if who == "" {
+			who = strings.TrimSpace(node.SenderID)
+		}
+		if who == "" {
+			who = "群友"
+		}
+		body := RenderBlocksText(node.Blocks)
+		if body == "" {
+			continue
+		}
+		lines = append(lines, who+": "+body)
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	joined := strings.Join(lines, " | ")
+	return "[合并转发: " + truncatePreview(joined, 800) + "]"
 }
 
 func formatSpeakerLabel(m store.TimelineMessage, botName string) string {

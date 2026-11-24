@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-const defaultMaxBlobBytes int64 = 64 << 20
+const defaultMaxBlobBytes int64 = 128 << 20
 
 var ErrBlobNotFound = errors.New("blob not found")
 

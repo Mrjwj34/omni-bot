@@ -682,6 +682,126 @@ func TestKernelE2E_FullPipelineAndDreaming(t *testing.T) {
 	}
 }
 
+func TestCollectTimelineMediaParts_PreservesRecentAndForwardMedia(t *testing.T) {
+	p := &Pipeline{
+		botName:  "bk101",
+		location: time.FixedZone("CST", 8*3600),
+	}
+
+	mustJSON := func(blocks []protocol.ContentBlock) string {
+		b, err := json.Marshal(blocks)
+		if err != nil {
+			t.Fatalf("marshal blocks: %v", err)
+		}
+		return string(b)
+	}
+
+	now := time.Date(2026, 11, 24, 16, 30, 0, 0, p.location).UnixMilli()
+	recent := []store.TimelineMessage{
+		{
+			SeqID:        1,
+			MsgID:        "m-photo",
+			SenderName:   "1",
+			TimestampMs:  now,
+			Status:       "PROCESSED",
+			RenderedText: "[图片]",
+			ContentJSON: mustJSON([]protocol.ContentBlock{
+				{
+					Type: protocol.BlockImage,
+					Media: &protocol.MediaRef{
+						BlobID:   "blob-photo-1",
+						MIMEType: "image/jpeg",
+						Meta:     map[string]any{"sub_type": "0"},
+					},
+				},
+			}),
+		},
+		{
+			SeqID:        2,
+			MsgID:        "m-forward",
+			SenderName:   "阿杰",
+			TimestampMs:  now + 2000,
+			Status:       "PROCESSED",
+			RenderedText: "[合并转发:1条]",
+			ContentJSON: mustJSON([]protocol.ContentBlock{
+				{
+					Type: protocol.BlockForwardTree,
+					ForwardNodes: []protocol.ForwardNode{
+						{
+							SenderName:  "小周",
+							TimestampMs: now + 1000,
+							Blocks: []protocol.ContentBlock{
+								{Type: protocol.BlockText, Text: "看这个图"},
+								{
+									Type: protocol.BlockImage,
+									Media: &protocol.MediaRef{
+										BlobID:   "blob-fwd-img",
+										MIMEType: "image/png",
+										Meta:     map[string]any{"sub_type": "0"},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
+			SeqID:        3,
+			MsgID:        "m-video",
+			SenderName:   "墨雨",
+			TimestampMs:  now + 3000,
+			Status:       "PROCESSED",
+			RenderedText: "[视频]",
+			ContentJSON: mustJSON([]protocol.ContentBlock{
+				{
+					Type: protocol.BlockVideo,
+					Media: &protocol.MediaRef{
+						BlobID:   "blob-video-1",
+						MIMEType: "video/mp4",
+					},
+				},
+			}),
+		},
+		{
+			SeqID:        4,
+			MsgID:        "m-at",
+			SenderName:   "1",
+			IsAtBot:      true,
+			TimestampMs:  now + 4000,
+			Status:       "UNPROCESSED",
+			RenderedText: "@我",
+			ContentJSON: mustJSON([]protocol.ContentBlock{
+				{Type: protocol.BlockMention, TargetID: "2198016861", TargetName: "我"},
+			}),
+		},
+	}
+
+	parts := p.collectTimelineMediaParts(recent, recent[3:4])
+	var gotBlobs []string
+	var gotLabels []string
+	for _, pt := range parts {
+		if pt.Kind == ai.PartText {
+			gotLabels = append(gotLabels, pt.Text)
+		} else if pt.Media != nil {
+			gotBlobs = append(gotBlobs, pt.Media.BlobID)
+		}
+	}
+
+	wantBlobs := []string{"blob-photo-1", "blob-fwd-img", "blob-video-1"}
+	if len(gotBlobs) != len(wantBlobs) {
+		t.Fatalf("mounted blobs = %v, want %v (labels=%v)", gotBlobs, wantBlobs, gotLabels)
+	}
+	for i := range wantBlobs {
+		if gotBlobs[i] != wantBlobs[i] {
+			t.Fatalf("mounted blob[%d] = %q, want %q", i, gotBlobs[i], wantBlobs[i])
+		}
+	}
+	if expanded := renderTimelineMessageText(recent[1]); !strings.Contains(expanded, "小周: 看这个图 [图片]") {
+		t.Fatalf("expected expanded forward tree text, got %q", expanded)
+	}
+}
+
 func waitForTraceStatus(t *testing.T, st *store.Store, roomID, wantStatus string, timeout time.Duration) store.RunTrace {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
