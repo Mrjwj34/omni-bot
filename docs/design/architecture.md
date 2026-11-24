@@ -152,7 +152,7 @@ flowchart TB
 将原有单体处理逻辑拆解为三组清晰、低耦合的 Go 钩子接口：
 
 1. **`OnGate`（门控与状态演进）**
-   * 组装轻量近期窗口 + 当前第一人称 `<inner_feeling>`，调用 `DecisionModel` 在单次请求内并行输出：是否接话概率、令咒/漂移自检等扩展门控信号，以及本轮新消息对 `(P, A, D)` 三维情绪的瞬时刺激（详见 [persona-and-emotion.md](persona-and-emotion.md)）。
+   * 组装轻量近期窗口 + 当前第一人称 `<inner_feeling>`，调用 `DecisionModel` 在单次请求内并行输出：是否接话概率，以及本轮新消息对 `(P, A, D)` 三维情绪的瞬时刺激（详见 [persona-and-emotion.md](persona-and-emotion.md)）。
    * 情绪状态机依据气质动力参数更新连续 `(P, A, D)` 向量（即使未放行发言，旁观群聊亦平滑演进）。**严禁在此阶段根据情绪数值硬编码篡改接话阈值或后续气泡数量。**
    * 如记忆被动联想启用并发向量种子（由 [memory.md](memory.md) 阶段 0 评测裁决），query embedding 计算与 `DecisionModel` 请求并发发出，消除额外端到端延迟。
 
@@ -167,7 +167,7 @@ flowchart TB
        1. 滚动剧情摘要 + 预算裁剪后的近期逐字时间线（Bot 自身历史回复以自身群昵称或 `[我(昵称)]` 呈现，避免人称割裂）；
        2. 当下细粒度情绪体验 `<inner_feeling>`（第一人称内在感受，原点中性区不注入）；
        3. 被动联想浮现记忆 `<associated_memories>`（由记忆 Contributor 产出，统一带 `t_event` 时间前缀与窗口去重）；
-       4. 表情包手牌架 `<available_memes>` 及令咒 / Drift 纠偏等扩展区块。
+       4. 表情包手牌架 `<available_memes>` 及其他按需扩展区块。
 
 3. **`OnPostRun`（投递、审计与后台异步）**
    * 解析模型最终输出为 `[]OutboundAction` IR 并下发给 Frontend Adapter，实际发出的文本/媒体回写时间线；
@@ -195,7 +195,7 @@ flowchart TB
 * **实现复用**：参考 `pi` 与 REI 的极简工具集哲学（`bash`、`read`、`write`、`edit`、`find`、`grep`），直接借鉴 REI 已踩坑验证的输出头尾截断（行数/字节预算 + 完整日志落盘路径）、超时控制与子进程组强杀机制，不重复造轮子；不引入 REI 跨网远程 Env 的分布式重投递台账。
 * **默认关闭与安全隔离**：
   * 该工具组在运行时配置中**默认关闭**（不向模型注册 Schema），支持通过 WebUI 配置一键启用；
-  * 启用后，命令执行与文件访问**必须约束在独立的受限工作区/隔离环境**中，子进程环境剔除 Kernel 所有 API Key 与敏感环境变量，严禁访问主 SQLite 数据库与配置文件；任何群聊交互机制（如令咒）均无权绕过此边界。
+  * 启用后，命令执行与文件访问**必须约束在独立的受限工作区/隔离环境**中，子进程环境剔除 Kernel 所有 API Key 与敏感环境变量，严禁访问主 SQLite 数据库与配置文件；任何群聊交互机制均无权绕过此边界。
 
 ### 6.3 MCP 扩展（官方最新 Go SDK）
 
