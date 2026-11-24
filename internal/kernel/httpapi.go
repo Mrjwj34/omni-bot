@@ -93,10 +93,16 @@ type APIRunTraceDetail struct {
 	Error        string                    `json:"error,omitempty"`
 }
 
+type APIPADHistoryPoint struct {
+	Value       pad.Vec3 `json:"value"`
+	TimestampMs int64    `json:"timestamp_ms"`
+}
+
 type APIDashboardResponse struct {
 	Status       string               `json:"status"`
 	UptimeSec    int64                `json:"uptime_sec"`
 	PAD          APIPADState          `json:"pad"`
+	PADHistory   []APIPADHistoryPoint `json:"pad_history,omitempty"`
 	Adapters     []APIAdapterInfo     `json:"adapters"`
 	Metrics      APIDashboardMetrics  `json:"metrics"`
 	RecentTraces []APIRunTraceSummary `json:"recent_traces"`
@@ -329,12 +335,28 @@ func (rt *Runtime) RegisterRoutes(mux *http.ServeMux) {
 
 func (rt *Runtime) handleGetDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	rooms, _ := rt.Store.ListRecentTimelineRooms(ctx, 20)
 	roomID := strings.TrimSpace(r.URL.Query().Get("room_id"))
 	if roomID == "" {
-		roomID = store.DefaultPersonaRoomID
+		if len(rooms) > 0 {
+			roomID = rooms[0]
+		} else {
+			roomID = store.DefaultPersonaRoomID
+		}
 	}
 
 	padState := rt.currentAPIPAD(ctx, roomID)
+	var padHistory []APIPADHistoryPoint
+	if hist, err := rt.Store.ListPADHistory(ctx, roomID, 24); err == nil && len(hist) > 0 {
+		padHistory = make([]APIPADHistoryPoint, len(hist))
+		for i, h := range hist {
+			// ListPADHistory returns newest-first; reverse into chronological order for sparkline.
+			padHistory[len(hist)-1-i] = APIPADHistoryPoint{
+				Value:       pad.Vec3{P: h.P, A: h.A, D: h.D},
+				TimestampMs: h.CreatedAtMs,
+			}
+		}
+	}
 
 	adapters := make([]APIAdapterInfo, 0)
 	if rt.Hub != nil {
@@ -407,7 +429,6 @@ func (rt *Runtime) handleGetDashboard(w http.ResponseWriter, r *http.Request) {
 	if totalMsgs, err := rt.Store.CountTimelineMessages(ctx); err == nil {
 		messagesTotal = totalMsgs
 	}
-	rooms, _ := rt.Store.ListRecentTimelineRooms(ctx, 20)
 
 	status := "ok"
 	if reg := rt.AIRegistry(); reg == nil {
@@ -415,10 +436,11 @@ func (rt *Runtime) handleGetDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeAPIJSON(w, http.StatusOK, APIDashboardResponse{
-		Status:    status,
-		UptimeSec: max(int64(0), int64(now.Sub(rt.startedAt).Seconds())),
-		PAD:       padState,
-		Adapters:  adapters,
+		Status:     status,
+		UptimeSec:  max(int64(0), int64(now.Sub(rt.startedAt).Seconds())),
+		PAD:        padState,
+		PADHistory: padHistory,
+		Adapters:   adapters,
 		Metrics: APIDashboardMetrics{
 			RunsToday:     runsToday,
 			RepliesToday:  repliesToday,

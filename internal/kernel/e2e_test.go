@@ -772,7 +772,7 @@ func TestCollectTimelineMediaParts_PreservesRecentAndForwardMedia(t *testing.T) 
 			Status:       "UNPROCESSED",
 			RenderedText: "@我",
 			ContentJSON: mustJSON([]protocol.ContentBlock{
-				{Type: protocol.BlockMention, TargetID: "2198016861", TargetName: "我"},
+				{Type: protocol.BlockMention, TargetID: "99999", TargetName: "我"},
 			}),
 		},
 	}

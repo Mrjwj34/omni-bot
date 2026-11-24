@@ -526,34 +526,34 @@ func TestNormalizerMentionNameResolution(t *testing.T) {
 
 	norm := NewNormalizer(NormalizerOptions{})
 
-	// First message teaches peer nickname for 3050667529.
+	// First message teaches peer nickname for 10001.
 	_, ok, err := norm.NormalizeGroupMessage(t.Context(), OneBotEvent{
 		PostType:    "message",
 		MessageType: "group",
-		SelfID:      2198016861,
-		GroupID:     935279370,
-		UserID:      3050667529,
+		SelfID:      99999,
+		GroupID:     888888,
+		UserID:      10001,
 		MessageID:   "m1",
-		Sender:      OneBotSender{UserID: 3050667529, Nickname: "小周"},
+		Sender:      OneBotSender{UserID: 10001, Nickname: "小周"},
 		Message:     json.RawMessage(`[{"type":"text","data":{"text":"hi"}}]`),
 	})
 	if err != nil || !ok {
 		t.Fatalf("seed nick failed: ok=%v err=%v", ok, err)
 	}
 
-	// Second message mentions both bot (no name field from NapCat) and peer 3050667529.
+	// Second message mentions both bot (no name field from NapCat) and peer 10001.
 	msg, ok, err := norm.NormalizeGroupMessage(t.Context(), OneBotEvent{
 		PostType:    "message",
 		MessageType: "group",
-		SelfID:      2198016861,
-		GroupID:     935279370,
+		SelfID:      99999,
+		GroupID:     888888,
 		UserID:      10002,
 		MessageID:   "m2",
 		Sender:      OneBotSender{UserID: 10002, Nickname: "阿杰"},
 		Message: json.RawMessage(`[
-			{"type":"at","data":{"qq":"2198016861"}},
+			{"type":"at","data":{"qq":"99999"}},
 			{"type":"text","data":{"text":" 找下 "}},
-			{"type":"at","data":{"qq":"3050667529"}}
+			{"type":"at","data":{"qq":"10001"}}
 		]`),
 	})
 	if err != nil || !ok {
