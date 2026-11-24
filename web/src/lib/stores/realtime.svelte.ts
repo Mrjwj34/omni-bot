@@ -52,8 +52,7 @@ function deriveMoodTone(v: PADVec3): BadgeTone {
 	return 'amber';
 }
 
-function deriveMoodLabel(v: PADVec3, feeling?: string): string {
-	if (feeling && feeling.trim()) return feeling.trim();
+function deriveMoodLabel(v: PADVec3): string {
 	const mag = Math.hypot(v.p, v.a, v.d);
 	if (mag < 0.18) return '平静待机';
 	if (v.p >= 0.2 && v.a >= 0.2) return '雀跃活跃';
@@ -86,7 +85,7 @@ class RealtimeStore {
 	configVersion = $state(0);
 
 	moodTone = $derived<BadgeTone>(deriveMoodTone(this.padState.value));
-	moodLabel = $derived<string>(deriveMoodLabel(this.padState.value, this.padState.feeling));
+	moodLabel = $derived<string>(deriveMoodLabel(this.padState.value));
 
 	private ws: WebSocket | null = null;
 	private shouldReconnect = false;
